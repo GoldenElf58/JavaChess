@@ -2,7 +2,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import static java.lang.Math.abs;
-import java.util.Arrays;
 
 public class GameState {
 
@@ -179,7 +178,8 @@ public class GameState {
 
         if (halfMoveClock > 0) {
             HashMap<int[], Integer> previousPositionCount = new HashMap<>(this.previousPositionCount);
-            previousPositionCount.put(this.board, previousPositionCount.getOrDefault(this.board, 0) + 1);
+            int positionCount = previousPositionCount.getOrDefault(this.board, 0) + 1;
+            previousPositionCount.put(this.board, positionCount);
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock,
                     !whiteMove, previousPositionCount);
@@ -191,8 +191,18 @@ public class GameState {
     }
 
     public boolean isWinner() {
-        return Arrays.stream(board).noneMatch(i -> i == 6) ||
-                Arrays.stream(board).noneMatch(i -> i == -6);
+        boolean hasWhiteKing = false;
+        boolean hasBlackKing = false;
+        for (int piece : board) {
+            if (piece == 6) {
+                hasWhiteKing = true;
+                if (hasBlackKing) break;
+            } else if (piece == -6) {
+                hasBlackKing = true;
+                if (hasWhiteKing) break;
+            }
+        }
+        return !hasWhiteKing || !hasBlackKing;
     }
 
     private void addMovesForKing(ArrayList<int[]> moves, int i) {
@@ -223,11 +233,12 @@ public class GameState {
             if (!(0 <= move[1] && move[1] < 64 && move[1] % 8 == i % 8 + direction[0] * j &&
                     move[1] / 8 == i / 8 + direction[1] * j))
                 break;
-            if (board[move[1]] * color == 0) {
+            int targetPieceType = board[move[1]] * color;
+            if (targetPieceType == 0) {
                 moves.add(move);
                 continue;
             }
-            if (board[move[1]] * color < 0) {
+            if (targetPieceType < 0) {
                 moves.add(move);
             }
             break;
