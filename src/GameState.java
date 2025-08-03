@@ -69,9 +69,11 @@ public class GameState {
 
     private void computeMoves() {
         moveCount = 0;
+        int pieceType;
         for (int i = 0; i < 64; i++) {
-            if (board[i] * color <= 0) continue;
-            switch (board[i] * color) {
+            pieceType = board[i] * color;
+            if (pieceType <= 0) continue;
+            switch (pieceType) {
                 case 1:
                     addMovesForPawn(i);
                     break;
@@ -97,23 +99,30 @@ public class GameState {
     private void addMoveSlot(int a, int b) {
         moves[moveCount * 4] = a;
         moves[moveCount * 4 + 1] = b;
-        moves[moveCount * 4 + 2] = 0;
-        moves[moveCount * 4 + 3] = 0;
         moveCount++;
     }
+
     private void addMoveSlot(int a, int b, int c) {
         moves[moveCount * 4] = a;
         moves[moveCount * 4 + 1] = b;
         moves[moveCount * 4 + 2] = c;
-        moves[moveCount * 4 + 3] = 0;
         moveCount++;
     }
+
     private void addMoveSlot(int a, int b, int c, int d) {
         moves[moveCount * 4] = a;
         moves[moveCount * 4 + 1] = b;
         moves[moveCount * 4 + 2] = c;
         moves[moveCount * 4 + 3] = d;
         moveCount++;
+    }
+
+    public int getMoveCount() {
+        return moveCount;
+    }
+
+    public int[] getMove(int moveIdx) {
+        return new int[]{moves[moveIdx * 4], moves[moveIdx * 4 + 1], moves[moveIdx * 4 + 2], moves[moveIdx * 4 + 3]};
     }
 
     public GameState makeMove(int[] move) {

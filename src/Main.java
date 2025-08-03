@@ -1,4 +1,3 @@
-import java.util.ArrayList;
 import java.util.Random;
 
 
@@ -9,12 +8,13 @@ public class Main {
         Random random = new Random();
         int halfMoves = 0;
         int N = 100_000;
+        int moveChoice;
         long startTime = System.nanoTime();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
             while (!gameState.isWinner()) {
 //                int j = 0;
-                int[] moves = gameState.getMoves();
+                gameState.getMoves();
 //                for (int[] move : moves) {
 //                    System.out.print(j + ": ");
 //                    for (int element : move) {
@@ -27,13 +27,13 @@ public class Main {
 //                System.out.println("" + gameState.whiteKing + gameState.whiteQueen +
 //                        gameState.blackKing + gameState.blackQueen);
 //                System.out.print("Enter move: ");
-                int moveChoice;
-                do {
-                    moveChoice = random.nextInt(moves.length / 4);
-                } while (moves[moveChoice * 4] == 0 && moves[moveChoice * 4 + 1] == 0);
+                moveChoice = random.nextInt(gameState.getMoveCount());
+//                do {
+//                    moveChoice = random.nextInt(gameState.getMoveCount());
+//                } while (moves[moveChoice * 4] == 0 && moves[moveChoice * 4 + 1] == 0);
 //                int moveChoice = scanner.nextInt();
 //                System.out.println();
-                gameState = gameState.makeMove(new int[]{moves[moveChoice * 4], moves[moveChoice * 4 + 1], moves[moveChoice * 4 + 2], moves[moveChoice * 4 + 3]});
+                gameState = gameState.makeMove(gameState.getMove(moveChoice));
                 halfMoves++;
             }
         }
