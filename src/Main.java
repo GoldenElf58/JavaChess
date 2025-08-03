@@ -6,14 +6,15 @@ public class Main {
     public static void main(String[] args) {
 //        Scanner scanner = new Scanner(System.in);
         GameState gameState = new GameState();
+        Random random = new Random();
         int halfMoves = 0;
-        int N = 10_000;
+        int N = 100_000;
         long startTime = System.nanoTime();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
             while (!gameState.isWinner()) {
 //                int j = 0;
-                ArrayList<int[]> moves = gameState.getMoves();
+                int[] moves = gameState.getMoves();
 //                for (int[] move : moves) {
 //                    System.out.print(j + ": ");
 //                    for (int element : move) {
@@ -26,11 +27,13 @@ public class Main {
 //                System.out.println("" + gameState.whiteKing + gameState.whiteQueen +
 //                        gameState.blackKing + gameState.blackQueen);
 //                System.out.print("Enter move: ");
-                Random random = new Random();
-                int moveChoice = random.nextInt(moves.size());
+                int moveChoice;
+                do {
+                    moveChoice = random.nextInt(moves.length / 4);
+                } while (moves[moveChoice * 4] == 0 && moves[moveChoice * 4 + 1] == 0);
 //                int moveChoice = scanner.nextInt();
 //                System.out.println();
-                gameState = gameState.makeMove(moves.get(moveChoice));
+                gameState = gameState.makeMove(new int[]{moves[moveChoice * 4], moves[moveChoice * 4 + 1], moves[moveChoice * 4 + 2], moves[moveChoice * 4 + 3]});
                 halfMoves++;
             }
         }

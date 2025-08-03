@@ -1,9 +1,10 @@
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import static java.lang.Math.abs;
 
 public class GameState {
+
+    private static final int MAX_MOVES = 256;
 
     static private final int[] startBoard = {
             -4, -2, -3, -5, -6, -3, -2, -4,
@@ -26,7 +27,8 @@ public class GameState {
     private final boolean whiteMove;
     private final int color;
     private final HashMap<int[], Integer> previousPositionCount;
-    private ArrayList<int[]> moves;
+    private final int[] moves = new int[MAX_MOVES * 4];
+    private int moveCount = 0;
 
     GameState() {
         board = startBoard;
@@ -58,42 +60,60 @@ public class GameState {
         this.previousPositionCount = previousPositionCount;
     }
 
-    public int[] getBoard() {
-        return board;
-    }
-
-    public ArrayList<int[]> getMoves() {
-        if (moves != null) return moves;
-        moves = getMovesNoCheck();
+    public int[] getMoves() {
+        if (moveCount == 0) {
+            computeMoves();
+        }
         return moves;
     }
 
-    public ArrayList<int[]> getMovesNoCheck() {
-        moves = new ArrayList<>();
+    private void computeMoves() {
+        moveCount = 0;
         for (int i = 0; i < 64; i++) {
             if (board[i] * color <= 0) continue;
             switch (board[i] * color) {
                 case 1:
-                    addMovesForPawn(moves, i);
+                    addMovesForPawn(i);
                     break;
                 case 2:
-                    addMovesForKnight(moves, i);
+                    addMovesForKnight(i);
                     break;
                 case 3:
-                    addMovesForBishop(moves, i);
+                    addMovesForBishop(i);
                     break;
                 case 4:
-                    addMovesForRook(moves, i);
+                    addMovesForRook(i);
                     break;
                 case 5:
-                    addMovesForQueen(moves, i);
+                    addMovesForQueen(i);
                     break;
                 case 6:
-                    addMovesForKing(moves, i);
+                    addMovesForKing(i);
                     break;
             }
         }
-        return moves;
+    }
+
+    private void addMoveSlot(int a, int b) {
+        moves[moveCount * 4] = a;
+        moves[moveCount * 4 + 1] = b;
+        moves[moveCount * 4 + 2] = 0;
+        moves[moveCount * 4 + 3] = 0;
+        moveCount++;
+    }
+    private void addMoveSlot(int a, int b, int c) {
+        moves[moveCount * 4] = a;
+        moves[moveCount * 4 + 1] = b;
+        moves[moveCount * 4 + 2] = c;
+        moves[moveCount * 4 + 3] = 0;
+        moveCount++;
+    }
+    private void addMoveSlot(int a, int b, int c, int d) {
+        moves[moveCount * 4] = a;
+        moves[moveCount * 4 + 1] = b;
+        moves[moveCount * 4 + 2] = c;
+        moves[moveCount * 4 + 3] = d;
+        moveCount++;
     }
 
     public GameState makeMove(int[] move) {
@@ -205,29 +225,29 @@ public class GameState {
         return !hasWhiteKing || !hasBlackKing;
     }
 
-    private void addMovesForKing(ArrayList<int[]> moves, int i) {
+    private void addMovesForKing(int i) {
         for (int j = -1; j <= 1; j++) {
             for (int k = -1; k <= 1; k++) {
                 int[] move = {i, i + j * 8 + k};
                 if (i % 8 + k == move[1] % 8 && 0 <= move[1] && move[1] < 64 &&
                         board[move[1]] * color <= 0) {
-                    moves.add(move);
+                    addMoveSlot(i, i + j * 8 + k);
                 }
             }
         }
 
         if ((whiteMove ? whiteKing : blackKing) &&
                 board[i + 1] == 0 && board[i + 2] == 0 && board[i + 3] == 4 * color) {
-            moves.add(new int[]{-1, i, 1});
+            addMoveSlot(-1, i, 1);
         }
 
         if (((whiteMove ? whiteQueen : blackQueen)) &&
                 board[i - 1] == 0 && board[i - 2] == 0 && board[i - 3] == 0 && board[i - 4] == 4 * color) {
-            moves.add(new int[]{-1, i, -1});
+            addMoveSlot(-1, i, -1);
         }
     }
 
-    private void addSlidingMoves(ArrayList<int[]> moves, int i, int[] direction) {
+    private void addSlidingMoves(int i, int[] direction) {
         for (int j = 1; j < 8; j++) {
             int[] move = {i, i + direction[0] * j + direction[1] * j * 8};
             if (!(0 <= move[1] && move[1] < 64 && move[1] % 8 == i % 8 + direction[0] * j &&
@@ -235,74 +255,74 @@ public class GameState {
                 break;
             int targetPieceType = board[move[1]] * color;
             if (targetPieceType == 0) {
-                moves.add(move);
+                addMoveSlot(i, move[1]);
                 continue;
             }
             if (targetPieceType < 0) {
-                moves.add(move);
+                addMoveSlot(i, move[1]);
             }
             break;
         }
     }
 
-    private void addMovesForQueen(ArrayList<int[]> moves, int i) {
-        addSlidingMoves(moves, i, new int[]{1, 1});
-        addSlidingMoves(moves, i, new int[]{1, -1});
-        addSlidingMoves(moves, i, new int[]{-1, 1});
-        addSlidingMoves(moves, i, new int[]{-1, -1});
-        addSlidingMoves(moves, i, new int[]{1, 0});
-        addSlidingMoves(moves, i, new int[]{-1, 0});
-        addSlidingMoves(moves, i, new int[]{0, 1});
-        addSlidingMoves(moves, i, new int[]{0, -1});
+    private void addMovesForQueen(int i) {
+        addSlidingMoves(i, new int[]{1, 1});
+        addSlidingMoves(i, new int[]{1, -1});
+        addSlidingMoves(i, new int[]{-1, 1});
+        addSlidingMoves(i, new int[]{-1, -1});
+        addSlidingMoves(i, new int[]{1, 0});
+        addSlidingMoves(i, new int[]{-1, 0});
+        addSlidingMoves(i, new int[]{0, 1});
+        addSlidingMoves(i, new int[]{0, -1});
     }
 
-    private void addMovesForRook(ArrayList<int[]> moves, int i) {
-        addSlidingMoves(moves, i, new int[]{1, 0});
-        addSlidingMoves(moves, i, new int[]{-1, 0});
-        addSlidingMoves(moves, i, new int[]{0, 1});
-        addSlidingMoves(moves, i, new int[]{0, -1});
+    private void addMovesForRook(int i) {
+        addSlidingMoves(i, new int[]{1, 0});
+        addSlidingMoves(i, new int[]{-1, 0});
+        addSlidingMoves(i, new int[]{0, 1});
+        addSlidingMoves(i, new int[]{0, -1});
     }
 
-    private void addMovesForBishop(ArrayList<int[]> moves, int i) {
-        addSlidingMoves(moves, i, new int[]{1, 1});
-        addSlidingMoves(moves, i, new int[]{1, -1});
-        addSlidingMoves(moves, i, new int[]{-1, 1});
-        addSlidingMoves(moves, i, new int[]{-1, -1});
+    private void addMovesForBishop(int i) {
+        addSlidingMoves(i, new int[]{1, 1});
+        addSlidingMoves(i, new int[]{1, -1});
+        addSlidingMoves(i, new int[]{-1, 1});
+        addSlidingMoves(i, new int[]{-1, -1});
     }
 
-    private void addMovesForKnight(ArrayList<int[]> moves, int i) {
+    private void addMovesForKnight(int i) {
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
                 int[] move = {i, i + j * 8 + k};
                 if (i % 8 + k == move[1] % 8 && 0 <= move[1] && move[1] < 64) {
                     if (board[move[1]] * color <= 0) {
-                        moves.add(move);
+                        addMoveSlot(i, move[1]);
                     }
                 }
                 move = new int[]{i, i + j + k * 8};
                 if (i % 8 + j == move[1] % 8 && 0 <= move[1] && move[1] < 64) {
                     if (board[move[1]] * color <= 0) {
-                        moves.add(move);
+                        addMoveSlot(i, move[1]);
                     }
                 }
             }
         }
     }
 
-    private void addMovesForPawn(ArrayList<int[]> moves, int i) {
+    private void addMovesForPawn(int i) {
         int destination = i - 8 * color;
         boolean isPromotion = whiteMove ? i / 8 == 1 : i / 8 == 6;
 
         if (board[destination] == 0) {
             if (isPromotion) {
-                moves.add(new int[]{-2, i, destination, 2 * color}); // Knight
-                moves.add(new int[]{-2, i, destination, 3 * color}); // Bishop
-                moves.add(new int[]{-2, i, destination, 4 * color}); // Rook
-                moves.add(new int[]{-2, i, destination, 5 * color}); // Queen
+                addMoveSlot(-2, i, destination, 2 * color); // Knight
+                addMoveSlot(-2, i, destination, 3 * color); // Bishop
+                addMoveSlot(-2, i, destination, 4 * color); // Rook
+                addMoveSlot(-2, i, destination, 5 * color); // Queen
             } else {
-                moves.add(new int[]{i, destination}); // normal move
+                addMoveSlot(i, destination); // normal move
                 if ((whiteMove ? i / 8 == 6 : i / 8 == 1) && board[i - 16 * color] == 0) {
-                    moves.add(new int[]{i, i - 16 * color}); // double move
+                    addMoveSlot(i, i - 16 * color); // double move
                 }
             }
         }
@@ -310,24 +330,24 @@ public class GameState {
         // Capture Left
         if ((destination - 1 + 8) % 8 != 7 && board[destination - 1] * color < 0) {
             if (isPromotion) {
-                moves.add(new int[]{-2, i, destination - 1, 2 * color}); // Knight
-                moves.add(new int[]{-2, i, destination - 1, 3 * color}); // Bishop
-                moves.add(new int[]{-2, i, destination - 1, 4 * color}); // Rook
-                moves.add(new int[]{-2, i, destination - 1, 5 * color}); // Queen
+                addMoveSlot(-2, i, destination - 1, 2 * color); // Knight
+                addMoveSlot(-2, i, destination - 1, 3 * color); // Bishop
+                addMoveSlot(-2, i, destination - 1, 4 * color); // Rook
+                addMoveSlot(-2, i, destination - 1, 5 * color); // Queen
             } else {
-                moves.add(new int[]{i, destination - 1});
+                addMoveSlot(i, destination - 1);
             }
         }
 
         // Capture Right
         if ((destination + 1) % 8 != 0 && board[destination + 1] * color < 0) {
             if (isPromotion) {
-                moves.add(new int[]{-2, i, destination + 1, 2 * color}); // Knight
-                moves.add(new int[]{-2, i, destination + 1, 3 * color}); // Bishop
-                moves.add(new int[]{-2, i, destination + 1, 4 * color}); // Rook
-                moves.add(new int[]{-2, i, destination + 1, 5 * color}); // Queen
+                addMoveSlot(-2, i, destination + 1, 2 * color); // Knight
+                addMoveSlot(-2, i, destination + 1, 3 * color); // Bishop
+                addMoveSlot(-2, i, destination + 1, 4 * color); // Rook
+                addMoveSlot(-2, i, destination + 1, 5 * color); // Queen
             } else {
-                moves.add(new int[]{i, destination + 1});
+                addMoveSlot(i, destination + 1);
             }
         }
 
@@ -335,9 +355,9 @@ public class GameState {
         if (lastMove != null) {
             // Left
             if (lastMove[1] % 8 == i % 8 - 1 && lastMove[1] == i - 1) {
-                moves.add(new int[]{-3, i, -1});
+                addMoveSlot(-3, i, -1);
             } else if (lastMove[1] % 8 == i % 8 + 1 && lastMove[1] == i + 1) { // Right
-                moves.add(new int[]{-3, i, 1});
+                addMoveSlot(-3, i, 1);
             }
         }
     }
