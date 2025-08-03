@@ -27,8 +27,9 @@ public class GameState {
     private final boolean whiteMove;
     private final int color;
     private final HashMap<int[], Integer> previousPositionCount;
-    private final int[] moves = new int[MAX_MOVES * 3];
+    public int[] moves = new int[MAX_MOVES * 3];
     private int moveCount = 0;
+    private boolean movesGenerated = false;
 
     GameState() {
         board = startBoard;
@@ -63,6 +64,42 @@ public class GameState {
     public void computeMoves() {
         if (moveCount == 0)
             computeMovesNoCheck();
+        GameState gameState;
+        int[] newBoard;
+        boolean legal;
+        boolean kingPresent;
+        int[] newMoves = new int[moveCount * 3];
+        int newMoveCount = 0;
+        int[] move;
+        for (int i = 0; i < moveCount; i++) {
+            move = getMove(i);
+            gameState = makeMove(move);
+            gameState.computeMovesNoCheck();
+            legal = true;
+            for (int j = 0; j < gameState.moveCount; j++) {
+                newBoard = gameState.makeMoveOnlyBoard(gameState.getMove(j));
+                kingPresent = false;
+                for (int piece : newBoard) {
+                    if (piece == 6 * color) {
+                        kingPresent = true;
+                        break;
+                    }
+                }
+                if (!kingPresent) {
+                    legal = false;
+                    break;
+                }
+            }
+            if (legal) {
+                newMoves[newMoveCount * 3] = move[0];
+                newMoves[newMoveCount * 3 + 1] = move[1];
+                newMoves[newMoveCount * 3 + 2] = move[2];
+                newMoveCount++;
+            }
+        }
+        moves = newMoves;
+        movesGenerated = true;
+        moveCount = newMoveCount;
     }
 
     private void computeMovesNoCheck() {
@@ -107,20 +144,12 @@ public class GameState {
         moveCount++;
     }
 
-//    private void addMoveSlot(int a, int b, int c, int d) {
-//        moves[moveCount * 4] = a;
-//        moves[moveCount * 4 + 1] = b;
-//        moves[moveCount * 4 + 2] = c;
-//        moves[moveCount * 4 + 3] = d;
-//        moveCount++;
-//    }
-
     public int getMoveCount() {
         return moveCount;
     }
 
     public int[] getMove(int moveIdx) {
-        return new int[]{moves[moveIdx * 3], moves[moveIdx * 3 + 1], moves[moveIdx * 3 + 2], moves[moveIdx * 3 + 3]};
+        return new int[]{moves[moveIdx * 3], moves[moveIdx * 3 + 1], moves[moveIdx * 3 + 2]};
     }
 
     public GameState makeMove(int[] move) {
@@ -226,19 +255,64 @@ public class GameState {
                 !whiteMove, new HashMap<>());
     }
 
+    public int[] makeMoveOnlyBoard(int[] move) {
+        int[] newBoard = board.clone();
+
+        // Castle
+        if (move[0] == -1) {
+            newBoard[move[1] + move[2] * 2] = 6 * color;
+            newBoard[move[1] + move[2]] = 4 * color;
+            newBoard[move[1]] = 0;
+            newBoard[move[1] + (move[2] == 1 ? 3 : -4)] = 0;
+            return newBoard;
+        }
+
+        // Promotion
+        if (move[0] == -2) {
+            newBoard[move[1] - 8 * color] = move[2];
+            newBoard[move[1]] = 0;
+            return newBoard;
+        }
+
+        // En Passant
+        if (move[0] == -3) {
+            newBoard[move[1] - color * 8 + move[2]] = color;
+            newBoard[move[1] + move[2]] = 0;
+            newBoard[move[1]] = 0;
+            return newBoard;
+        }
+
+        // Promotion Taking
+        if (move[0] <= -4) {
+            newBoard[move[2]] = -2 - move[0];
+            newBoard[move[1]] = 0;
+            return newBoard;
+        }
+
+        newBoard[move[1]] = newBoard[move[0]];
+        newBoard[move[0]] = 0;
+
+        return newBoard;
+    }
+
     public boolean isWinner() {
+        if (movesGenerated && moveCount == 0) return true;
         boolean hasWhiteKing = false;
         boolean hasBlackKing = false;
+        boolean isEmpty = true;
         for (int piece : board) {
             if (piece == 6) {
                 hasWhiteKing = true;
-                if (hasBlackKing) break;
+                if (hasBlackKing && isEmpty) break;
             } else if (piece == -6) {
                 hasBlackKing = true;
-                if (hasWhiteKing) break;
+                if (hasWhiteKing && isEmpty) break;
+            } else if (piece != 0) {
+                isEmpty = false;
+                if (hasBlackKing && hasWhiteKing) break;
             }
         }
-        return !hasWhiteKing || !hasBlackKing;
+        return !hasWhiteKing || !hasBlackKing || isEmpty;
     }
 
     private void addMovesForKing(int i) {
@@ -309,10 +383,10 @@ public class GameState {
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
                 int target = i + j * 8 + k;
-                if (i % 8 + k == target % 8 && 0 <= target && target < 64 &&board[target] * color <= 0)
+                if (i % 8 + k == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
                     addMoveSlot(i, target);
                 target = i + j + k * 8;
-                if (i % 8 + j == target % 8 && 0 <= target && target < 64 &&board[target] * color <= 0)
+                if (i % 8 + j == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
                     addMoveSlot(i, target);
             }
         }

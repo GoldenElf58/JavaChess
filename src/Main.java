@@ -7,32 +7,17 @@ public class Main {
         GameState gameState;
         Random random = new Random();
         int halfMoves = 0;
-        int N = 100_000;
+        int N = 1000;
         int moveChoice;
         long startTime = System.nanoTime();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
             while (!gameState.isWinner()) {
-//                int j = 0;
                 gameState.computeMoves();
-//                for (int[] move : moves) {
-//                    System.out.print(j + ": ");
-//                    for (int element : move) {
-//                        System.out.print(element + " ");
-//                    }
-//                    System.out.println();
-//                    j++;
-//                }
-//                System.out.println(gameState);
-//                System.out.println("" + gameState.whiteKing + gameState.whiteQueen +
-//                        gameState.blackKing + gameState.blackQueen);
-//                System.out.print("Enter move: ");
+                if (gameState.getMoveCount() == 0) {
+                    break;
+                }
                 moveChoice = random.nextInt(gameState.getMoveCount());
-//                do {
-//                    moveChoice = random.nextInt(gameState.getMoveCount());
-//                } while (moves[moveChoice * 4] == 0 && moves[moveChoice * 4 + 1] == 0);
-//                int moveChoice = scanner.nextInt();
-//                System.out.println();
                 gameState = gameState.makeMove(gameState.getMove(moveChoice));
                 halfMoves++;
             }
