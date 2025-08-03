@@ -4,7 +4,7 @@ import static java.lang.Math.abs;
 
 public class GameState {
 
-    private static final int MAX_MOVES = 256;
+    private static final int MAX_MOVES = 218;
 
     static private final int[] startBoard = {
             -4, -2, -3, -5, -6, -3, -2, -4,
@@ -27,7 +27,7 @@ public class GameState {
     private final boolean whiteMove;
     private final int color;
     private final HashMap<int[], Integer> previousPositionCount;
-    private final int[] moves = new int[MAX_MOVES * 4];
+    private final int[] moves = new int[MAX_MOVES * 3];
     private int moveCount = 0;
 
     GameState() {
@@ -60,14 +60,12 @@ public class GameState {
         this.previousPositionCount = previousPositionCount;
     }
 
-    public int[] getMoves() {
-        if (moveCount == 0) {
-            computeMoves();
-        }
-        return moves;
+    public void computeMoves() {
+        if (moveCount == 0)
+            computeMovesNoCheck();
     }
 
-    private void computeMoves() {
+    private void computeMovesNoCheck() {
         moveCount = 0;
         int pieceType;
         for (int i = 0; i < 64; i++) {
@@ -97,32 +95,32 @@ public class GameState {
     }
 
     private void addMoveSlot(int a, int b) {
-        moves[moveCount * 4] = a;
-        moves[moveCount * 4 + 1] = b;
+        moves[moveCount * 3] = a;
+        moves[moveCount * 3 + 1] = b;
         moveCount++;
     }
 
     private void addMoveSlot(int a, int b, int c) {
-        moves[moveCount * 4] = a;
-        moves[moveCount * 4 + 1] = b;
-        moves[moveCount * 4 + 2] = c;
+        moves[moveCount * 3] = a;
+        moves[moveCount * 3 + 1] = b;
+        moves[moveCount * 3 + 2] = c;
         moveCount++;
     }
 
-    private void addMoveSlot(int a, int b, int c, int d) {
-        moves[moveCount * 4] = a;
-        moves[moveCount * 4 + 1] = b;
-        moves[moveCount * 4 + 2] = c;
-        moves[moveCount * 4 + 3] = d;
-        moveCount++;
-    }
+//    private void addMoveSlot(int a, int b, int c, int d) {
+//        moves[moveCount * 4] = a;
+//        moves[moveCount * 4 + 1] = b;
+//        moves[moveCount * 4 + 2] = c;
+//        moves[moveCount * 4 + 3] = d;
+//        moveCount++;
+//    }
 
     public int getMoveCount() {
         return moveCount;
     }
 
     public int[] getMove(int moveIdx) {
-        return new int[]{moves[moveIdx * 4], moves[moveIdx * 4 + 1], moves[moveIdx * 4 + 2], moves[moveIdx * 4 + 3]};
+        return new int[]{moves[moveIdx * 3], moves[moveIdx * 3 + 1], moves[moveIdx * 3 + 2], moves[moveIdx * 3 + 3]};
     }
 
     public GameState makeMove(int[] move) {
@@ -152,7 +150,7 @@ public class GameState {
 
         // Promotion
         if (move[0] == -2) {
-            newBoard[move[2]] = move[3];
+            newBoard[move[1] - 8 * color] = move[2];
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0,
@@ -163,6 +161,15 @@ public class GameState {
         if (move[0] == -3) {
             newBoard[move[1] - color * 8 + move[2]] = color;
             newBoard[move[1] + move[2]] = 0;
+            newBoard[move[1]] = 0;
+            return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                    null, halfMoves + 1, 0,
+                    !whiteMove, new HashMap<>());
+        }
+
+        // Promotion Taking
+        if (move[0] <= -4) {
+            newBoard[move[2]] = -2 - move[0];
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0,
@@ -237,10 +244,10 @@ public class GameState {
     private void addMovesForKing(int i) {
         for (int j = -1; j <= 1; j++) {
             for (int k = -1; k <= 1; k++) {
-                int[] move = {i, i + j * 8 + k};
-                if (i % 8 + k == move[1] % 8 && 0 <= move[1] && move[1] < 64 &&
-                        board[move[1]] * color <= 0) {
-                    addMoveSlot(i, i + j * 8 + k);
+                int destination = i + j * 8 + k;
+                if (i % 8 + k == destination % 8 && 0 <= destination && destination < 64 &&
+                        board[destination] * color <= 0) {
+                    addMoveSlot(i, destination);
                 }
             }
         }
@@ -256,80 +263,73 @@ public class GameState {
         }
     }
 
-    private void addSlidingMoves(int i, int[] direction) {
+    private void addSlidingMoves(int i, int direction1, int direction2) {
         for (int j = 1; j < 8; j++) {
-            int[] move = {i, i + direction[0] * j + direction[1] * j * 8};
-            if (!(0 <= move[1] && move[1] < 64 && move[1] % 8 == i % 8 + direction[0] * j &&
-                    move[1] / 8 == i / 8 + direction[1] * j))
+            int target = i + direction1 * j + direction2 * j * 8;
+            if (!(0 <= target && target < 64 && target % 8 == i % 8 + direction1 * j &&
+                    target / 8 == i / 8 + direction2 * j))
                 break;
-            int targetPieceType = board[move[1]] * color;
+            int targetPieceType = board[target] * color;
             if (targetPieceType == 0) {
-                addMoveSlot(i, move[1]);
+                addMoveSlot(i, target);
                 continue;
             }
-            if (targetPieceType < 0) {
-                addMoveSlot(i, move[1]);
-            }
+            if (targetPieceType < 0)
+                addMoveSlot(i, target);
             break;
         }
     }
 
     private void addMovesForQueen(int i) {
-        addSlidingMoves(i, new int[]{1, 1});
-        addSlidingMoves(i, new int[]{1, -1});
-        addSlidingMoves(i, new int[]{-1, 1});
-        addSlidingMoves(i, new int[]{-1, -1});
-        addSlidingMoves(i, new int[]{1, 0});
-        addSlidingMoves(i, new int[]{-1, 0});
-        addSlidingMoves(i, new int[]{0, 1});
-        addSlidingMoves(i, new int[]{0, -1});
+        addSlidingMoves(i, 1, 1);
+        addSlidingMoves(i, 1, -1);
+        addSlidingMoves(i, -1, 1);
+        addSlidingMoves(i, -1, -1);
+        addSlidingMoves(i, 1, 0);
+        addSlidingMoves(i, -1, 0);
+        addSlidingMoves(i, 0, 1);
+        addSlidingMoves(i, 0, -1);
     }
 
     private void addMovesForRook(int i) {
-        addSlidingMoves(i, new int[]{1, 0});
-        addSlidingMoves(i, new int[]{-1, 0});
-        addSlidingMoves(i, new int[]{0, 1});
-        addSlidingMoves(i, new int[]{0, -1});
+        addSlidingMoves(i, 1, 0);
+        addSlidingMoves(i, -1, 0);
+        addSlidingMoves(i, 0, 1);
+        addSlidingMoves(i, 0, -1);
     }
 
     private void addMovesForBishop(int i) {
-        addSlidingMoves(i, new int[]{1, 1});
-        addSlidingMoves(i, new int[]{1, -1});
-        addSlidingMoves(i, new int[]{-1, 1});
-        addSlidingMoves(i, new int[]{-1, -1});
+        addSlidingMoves(i, 1, 1);
+        addSlidingMoves(i, 1, -1);
+        addSlidingMoves(i, -1, 1);
+        addSlidingMoves(i, -1, -1);
     }
 
     private void addMovesForKnight(int i) {
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
-                int[] move = {i, i + j * 8 + k};
-                if (i % 8 + k == move[1] % 8 && 0 <= move[1] && move[1] < 64) {
-                    if (board[move[1]] * color <= 0) {
-                        addMoveSlot(i, move[1]);
-                    }
-                }
-                move = new int[]{i, i + j + k * 8};
-                if (i % 8 + j == move[1] % 8 && 0 <= move[1] && move[1] < 64) {
-                    if (board[move[1]] * color <= 0) {
-                        addMoveSlot(i, move[1]);
-                    }
-                }
+                int target = i + j * 8 + k;
+                if (i % 8 + k == target % 8 && 0 <= target && target < 64 &&board[target] * color <= 0)
+                    addMoveSlot(i, target);
+                target = i + j + k * 8;
+                if (i % 8 + j == target % 8 && 0 <= target && target < 64 &&board[target] * color <= 0)
+                    addMoveSlot(i, target);
             }
         }
     }
 
     private void addMovesForPawn(int i) {
-        int destination = i - 8 * color;
+        int forwardSquare = i - 8 * color;
         boolean isPromotion = whiteMove ? i / 8 == 1 : i / 8 == 6;
 
-        if (board[destination] == 0) {
+        if (board[forwardSquare] == 0) {
             if (isPromotion) {
-                addMoveSlot(-2, i, destination, 2 * color); // Knight
-                addMoveSlot(-2, i, destination, 3 * color); // Bishop
-                addMoveSlot(-2, i, destination, 4 * color); // Rook
-                addMoveSlot(-2, i, destination, 5 * color); // Queen
+                addMoveSlot(-2, i, 2 * color); // Knight
+                addMoveSlot(-2, i, 3 * color); // Bishop
+                addMoveSlot(-2, i, 4 * color); // Rook
+                addMoveSlot(-2, i, 5 * color); // Queen
             } else {
-                addMoveSlot(i, destination); // normal move
+                addMoveSlot(i, forwardSquare); // normal move
                 if ((whiteMove ? i / 8 == 6 : i / 8 == 1) && board[i - 16 * color] == 0) {
                     addMoveSlot(i, i - 16 * color); // double move
                 }
@@ -337,26 +337,26 @@ public class GameState {
         }
 
         // Capture Left
-        if ((destination - 1 + 8) % 8 != 7 && board[destination - 1] * color < 0) {
+        if ((forwardSquare - 1 + 8) % 8 != 7 && board[forwardSquare - 1] * color < 0) {
             if (isPromotion) {
-                addMoveSlot(-2, i, destination - 1, 2 * color); // Knight
-                addMoveSlot(-2, i, destination - 1, 3 * color); // Bishop
-                addMoveSlot(-2, i, destination - 1, 4 * color); // Rook
-                addMoveSlot(-2, i, destination - 1, 5 * color); // Queen
+                addMoveSlot(-4, i, forwardSquare - 1); // Knight
+                addMoveSlot(-5, i, forwardSquare - 1); // Bishop
+                addMoveSlot(-6, i, forwardSquare - 1); // Rook
+                addMoveSlot(-7, i, forwardSquare - 1); // Queen
             } else {
-                addMoveSlot(i, destination - 1);
+                addMoveSlot(i, forwardSquare - 1);
             }
         }
 
         // Capture Right
-        if ((destination + 1) % 8 != 0 && board[destination + 1] * color < 0) {
+        if ((forwardSquare + 1) % 8 != 0 && board[forwardSquare + 1] * color < 0) {
             if (isPromotion) {
-                addMoveSlot(-2, i, destination + 1, 2 * color); // Knight
-                addMoveSlot(-2, i, destination + 1, 3 * color); // Bishop
-                addMoveSlot(-2, i, destination + 1, 4 * color); // Rook
-                addMoveSlot(-2, i, destination + 1, 5 * color); // Queen
+                addMoveSlot(-4, i, forwardSquare + 1); // Knight
+                addMoveSlot(-5, i, forwardSquare + 1); // Bishop
+                addMoveSlot(-6, i, forwardSquare + 1); // Rook
+                addMoveSlot(-7, i, forwardSquare + 1); // Queen
             } else {
-                addMoveSlot(i, destination + 1);
+                addMoveSlot(i, forwardSquare + 1);
             }
         }
 

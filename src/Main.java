@@ -4,7 +4,7 @@ import java.util.Random;
 public class Main {
     public static void main(String[] args) {
 //        Scanner scanner = new Scanner(System.in);
-        GameState gameState = new GameState();
+        GameState gameState;
         Random random = new Random();
         int halfMoves = 0;
         int N = 100_000;
@@ -14,7 +14,7 @@ public class Main {
             gameState = new GameState();
             while (!gameState.isWinner()) {
 //                int j = 0;
-                gameState.getMoves();
+                gameState.computeMoves();
 //                for (int[] move : moves) {
 //                    System.out.print(j + ": ");
 //                    for (int element : move) {
@@ -38,7 +38,6 @@ public class Main {
             }
         }
         long endTime = System.nanoTime();
-        System.out.println(gameState);
         System.out.printf("Half moves: %,d%n", halfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %,d ms%n", (endTime - startTime) / 1_000_000);
