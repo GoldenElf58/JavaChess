@@ -82,14 +82,8 @@ public class GameState {
             move = getMove(moveIdx);
             newBoard = makeMoveOnlyBoard(move);
             illegal = false;
-            if (move[2] == 6 || move[0] == -1) {
-                for (int i = 0; i < 64; i++) {
-                    if (newBoard[i] == 6 * color) {
-                        kingIdx = i;
-                        break;
-                    }
-                }
-            } else kingIdx = currKingIdx;
+            if (move[0] == -1) kingIdx = move[1] + move[2] * 2;
+            else kingIdx = move[2] == 6 ? move[1] : currKingIdx;
             for (int i = 0; i < 64; i++) {
                 int pieceType = newBoard[i] * color;
                 switch (pieceType) {
