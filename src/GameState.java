@@ -62,35 +62,145 @@ public class GameState {
     }
 
     public void computeMoves() {
-        if (moveCount == 0)
-            computeMovesNoCheck();
-        GameState gameState;
+        if (moveCount != 0) return;
+        computeMovesNoCheck();
         int[] newBoard;
-        boolean legal;
-        boolean kingPresent;
+        boolean illegal;
         int[] newMoves = new int[moveCount * 3];
         int newMoveCount = 0;
         int[] move;
-        for (int i = 0; i < moveCount; i++) {
-            move = getMove(i);
-            gameState = makeMove(move);
-            gameState.computeMovesNoCheck();
-            legal = true;
-            for (int j = 0; j < gameState.moveCount; j++) {
-                newBoard = gameState.makeMoveOnlyBoard(gameState.getMove(j));
-                kingPresent = false;
-                for (int piece : newBoard) {
-                    if (piece == 6 * color) {
-                        kingPresent = true;
-                        break;
-                    }
-                }
-                if (!kingPresent) {
-                    legal = false;
+        int kingIdx = -1;
+        for (int i = 0; i < 64; i++) {
+            if (board[i] == 6 * color) {
+                kingIdx = i;
+                break;
+            }
+        }
+        if (kingIdx == -1) return;
+        for (int moveIdx = 0; moveIdx < moveCount; moveIdx++) {
+            move = getMove(moveIdx);
+            newBoard = makeMoveOnlyBoard(move);
+            illegal = false;
+            for (int i = 0; i < 64; i++) {
+                if (newBoard[i] == 6 * color) {
+                    kingIdx = i;
                     break;
                 }
             }
-            if (legal) {
+            for (int i = 0; i < 64; i++) {
+                int pieceType = newBoard[i] * color;
+                switch (pieceType) {
+                    case -1:
+                        int forwardSquare = i + 8 * color;
+
+                        if ((forwardSquare - 1 == kingIdx && (forwardSquare - 1 + 8) % 8 != 7) ||
+                                (forwardSquare + 1 == kingIdx && (forwardSquare + 1) % 8 != 0))
+                            illegal = true;
+                        break;
+                    case -2:
+                        for (int j = -2; j <= 2; j += 4) {
+                            for (int k = -1; k <= 1; k += 2) {
+                                int target = i + j * 8 + k;
+                                if (i % 8 + k == target % 8 && target == kingIdx) {
+                                    illegal = true;
+                                    break;
+                                }
+                                target = i + j + k * 8;
+                                if (i % 8 + j == target % 8 && target == kingIdx) {
+                                    illegal = true;
+                                    break;
+                                }
+                            }
+                            if (illegal) break;
+                        }
+                        break;
+                    case -3:
+                        for (int d1 = -1; d1 <= 1; d1 += 2) {
+                            for (int d2 = -1; d2 <= 1; d2 += 2) {
+                                for (int j = 1; j < 8; j++) {
+                                    int target = i + d1 * j + d2 * j * 8;
+                                    if (!(target % 8 == i % 8 + d1 * j && target / 8 == i / 8 + d2 * j))
+                                        break;
+                                    if (target == kingIdx) {
+                                        illegal = true;
+                                        break;
+                                    }
+                                    if (target < 0 || target > 63 || newBoard[target] != 0) break;
+                                }
+                                if (illegal) break;
+                            }
+                            if (illegal) break;
+                        }
+                        break;
+                    case -4:
+                        for (int d1 = -1; d1 <= 1; d1++) {
+                            for (int d2 = -1; d2 <= 1; d2++) {
+                                if (d1 == d2 || (d1 != 0 && d2 != 0)) continue;
+                                for (int j = 1; j < 8; j++) {
+                                    int target = i + d1 * j + d2 * j * 8;
+                                    if (!(target % 8 == i % 8 + d1 * j && target / 8 == i / 8 + d2 * j))
+                                        break;
+                                    if (target == kingIdx) {
+                                        illegal = true;
+                                        break;
+                                    }
+                                    if (target < 0 || target > 63 || newBoard[target] != 0) break;
+                                }
+                                if (illegal) break;
+                            }
+                            if (illegal) break;
+                        }
+                        break;
+                    case -5:
+                        for (int d1 = -1; d1 <= 1; d1++) {
+                            for (int d2 = -1; d2 <= 1; d2++) {
+                                if (d1 == 0 && d2 == 0) continue;
+                                for (int j = 1; j < 8; j++) {
+                                    int target = i + d1 * j + d2 * j * 8;
+                                    if (!(target % 8 == i % 8 + d1 * j && target / 8 == i / 8 + d2 * j))
+                                        break;
+                                    if (target == kingIdx) {
+                                        illegal = true;
+                                        break;
+                                    }
+                                    if (target < 0 || target > 63 || newBoard[target] != 0) break;
+                                }
+                                if (illegal) break;
+                            }
+                            if (illegal) break;
+                        }
+                        break;
+                    case -6:
+                        for (int j = -1; j <= 1; j++) {
+                            for (int k = -1; k <= 1; k++) {
+                                int destination = i + j * 8 + k;
+                                if (destination == kingIdx && i % 8 + k == destination % 8) {
+                                    illegal = true;
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                }
+                if (illegal) break;
+            }
+//            gameState.computeMovesNoCheck();
+//            legal = true;
+//            for (int j = 0; j < gameState.moveCount; j++) {
+//                newBoard = gameState.makeMoveOnlyBoard(gameState.getMove(j));
+//                kingPresent = false;
+//                for (int piece : newBoard) {
+//                    if (piece == 6 * color) {
+//                        kingPresent = true;
+//                        break;
+//                    }
+//                }
+//                if (!kingPresent) {
+//                    legal = false;
+//                    break;
+//                }
+//            }
+            if (!illegal) {
                 newMoves[newMoveCount * 3] = move[0];
                 newMoves[newMoveCount * 3 + 1] = move[1];
                 newMoves[newMoveCount * 3 + 2] = move[2];
