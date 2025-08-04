@@ -12,8 +12,8 @@ public class Main {
         watch.start();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
+            gameState.computeMoves();
             while (!gameState.isWinner()) {
-                gameState.computeMoves();
                 moveChoice = random.nextInt(gameState.getMoveCount());
                 gameState = gameState.makeMove(gameState.getMove(moveChoice));
                 halfMoves++;

@@ -17,17 +17,17 @@ public class GameState {
             4, 2, 3, 5, 6, 3, 2, 4
     };
     private final int[] board;
-    public final boolean whiteQueen;
-    public final boolean whiteKing;
-    public final boolean blackQueen;
-    public final boolean blackKing;
+    private final boolean whiteQueen;
+    private final boolean whiteKing;
+    private final boolean blackQueen;
+    private final boolean blackKing;
     private final int[] lastMove;
     private final int halfMoves;
     private final int halfMoveClock;
     private final boolean whiteMove;
     private final int color;
     private final HashMap<int[], Integer> previousPositionCount;
-    public int[] moves = new int[MAX_MOVES * 3];
+    private int[] moves = new int[MAX_MOVES * 3];
     private int moveCount = 0;
     private boolean movesGenerated = false;
 
@@ -63,7 +63,7 @@ public class GameState {
 
     public void computeMoves() {
         if (moveCount != 0) return;
-        computeMovesNoCheck();
+        computeMovesPseudoLegal();
         int[] newBoard;
         boolean illegal;
         int[] newMoves = new int[moveCount * 3];
@@ -212,7 +212,7 @@ public class GameState {
         moveCount = newMoveCount;
     }
 
-    private void computeMovesNoCheck() {
+    public void computeMovesPseudoLegal() {
         moveCount = 0;
         int pieceType;
         for (int i = 0; i < 64; i++) {
@@ -365,7 +365,7 @@ public class GameState {
                 !whiteMove, new HashMap<>());
     }
 
-    public int[] makeMoveOnlyBoard(int[] move) {
+    private int[] makeMoveOnlyBoard(int[] move) {
         int[] newBoard = board.clone();
 
         // Castle
