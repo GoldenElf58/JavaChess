@@ -81,105 +81,34 @@ public class GameState {
             move = getMove(moveIdx);
             newBoard = makeMoveOnlyBoard(move);
             illegal = false;
-            for (int i = 0; i < 64; i++) {
-                if (newBoard[i] == 6 * color) {
-                    kingIdx = i;
-                    break;
+            if (move[2] == 6 || move[0] == -1) {
+                for (int i = 0; i < 64; i++) {
+                    if (newBoard[i] == 6 * color) {
+                        kingIdx = i;
+                        break;
+                    }
                 }
             }
             for (int i = 0; i < 64; i++) {
                 int pieceType = newBoard[i] * color;
                 switch (pieceType) {
                     case -1:
-                        int forwardSquare = i + 8 * color;
-
-                        if ((forwardSquare - 1 == kingIdx && (forwardSquare - 1 + 8) % 8 != 7) ||
-                                (forwardSquare + 1 == kingIdx && (forwardSquare + 1) % 8 != 0))
-                            illegal = true;
+                        illegal = isPawnAttacking(i, kingIdx);
                         break;
                     case -2:
-                        for (int j = -2; j <= 2; j += 4) {
-                            for (int k = -1; k <= 1; k += 2) {
-                                int target = i + j * 8 + k;
-                                if (i % 8 + k == target % 8 && target == kingIdx) {
-                                    illegal = true;
-                                    break;
-                                }
-                                target = i + j + k * 8;
-                                if (i % 8 + j == target % 8 && target == kingIdx) {
-                                    illegal = true;
-                                    break;
-                                }
-                            }
-                            if (illegal) break;
-                        }
+                        illegal = isKnightAttacking(i, kingIdx);
                         break;
                     case -3:
-                        for (int d1 = -1; d1 <= 1; d1 += 2) {
-                            for (int d2 = -1; d2 <= 1; d2 += 2) {
-                                for (int j = 1; j < 8; j++) {
-                                    int target = i + d1 * j + d2 * j * 8;
-                                    if (!(target % 8 == i % 8 + d1 * j && target / 8 == i / 8 + d2 * j))
-                                        break;
-                                    if (target == kingIdx) {
-                                        illegal = true;
-                                        break;
-                                    }
-                                    if (target < 0 || target > 63 || newBoard[target] != 0) break;
-                                }
-                                if (illegal) break;
-                            }
-                            if (illegal) break;
-                        }
+                        illegal = isBishopAttacking(i, kingIdx, newBoard);
                         break;
                     case -4:
-                        for (int d1 = -1; d1 <= 1; d1++) {
-                            for (int d2 = -1; d2 <= 1; d2++) {
-                                if (d1 == d2 || (d1 != 0 && d2 != 0)) continue;
-                                for (int j = 1; j < 8; j++) {
-                                    int target = i + d1 * j + d2 * j * 8;
-                                    if (!(target % 8 == i % 8 + d1 * j && target / 8 == i / 8 + d2 * j))
-                                        break;
-                                    if (target == kingIdx) {
-                                        illegal = true;
-                                        break;
-                                    }
-                                    if (target < 0 || target > 63 || newBoard[target] != 0) break;
-                                }
-                                if (illegal) break;
-                            }
-                            if (illegal) break;
-                        }
+                        illegal = isRookAttacking(i, kingIdx, newBoard);
                         break;
                     case -5:
-                        for (int d1 = -1; d1 <= 1; d1++) {
-                            for (int d2 = -1; d2 <= 1; d2++) {
-                                if (d1 == 0 && d2 == 0) continue;
-                                for (int j = 1; j < 8; j++) {
-                                    int target = i + d1 * j + d2 * j * 8;
-                                    if (!(target % 8 == i % 8 + d1 * j && target / 8 == i / 8 + d2 * j))
-                                        break;
-                                    if (target == kingIdx) {
-                                        illegal = true;
-                                        break;
-                                    }
-                                    if (target < 0 || target > 63 || newBoard[target] != 0) break;
-                                }
-                                if (illegal) break;
-                            }
-                            if (illegal) break;
-                        }
+                        illegal = isQueenAttacking(i, kingIdx, newBoard);
                         break;
                     case -6:
-                        for (int j = -1; j <= 1; j++) {
-                            for (int k = -1; k <= 1; k++) {
-                                int destination = i + j * 8 + k;
-                                if (destination == kingIdx && i % 8 + k == destination % 8) {
-                                    illegal = true;
-                                    break;
-                                }
-                            }
-                        }
+                        illegal = isKingAttacking(i, kingIdx);
                         break;
                 }
                 if (illegal) break;
@@ -210,6 +139,94 @@ public class GameState {
         moves = newMoves;
         movesGenerated = true;
         moveCount = newMoveCount;
+    }
+
+    private boolean isPawnAttacking(int pawnIdx, int targetIdx) {
+        int forwardSquare = pawnIdx + 8 * color;
+
+        return (forwardSquare - 1 == targetIdx && (forwardSquare - 1 + 8) % 8 != 7) ||
+                (forwardSquare + 1 == targetIdx && (forwardSquare + 1) % 8 != 0);
+    }
+
+    private boolean isKnightAttacking(int knightIdx, int targetIdx) {
+        int knightMod8 = knightIdx % 8;
+        for (int j = -2; j <= 2; j += 4) {
+            for (int k = -1; k <= 1; k += 2) {
+                int target = knightIdx + j * 8 + k;
+                if (knightMod8 + k == target % 8 && target == targetIdx) return true;
+                target = knightIdx + j + k * 8;
+                if (knightMod8 + j == target % 8 && target == targetIdx) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isBishopAttacking(int bishopIdx, int targetIdx, int[] board) {
+        int bishopMod8 = bishopIdx % 8;
+        int bishopDiv8 = bishopIdx / 8;
+        for (int d1 = -1; d1 <= 1; d1 += 2) {
+            for (int d2 = -1; d2 <= 1; d2 += 2) {
+                for (int j = 1; j < 8; j++) {
+                    int target = bishopIdx + d1 * j + d2 * j * 8;
+                    if (!(target % 8 == bishopMod8 + d1 * j && target / 8 == bishopDiv8 + d2 * j))
+                        break;
+                    if (target == targetIdx)
+                        return true;
+                    if (target < 0 || target > 63 || board[target] != 0) break;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isRookAttacking(int rookIdx, int targetIdx, int[] board) {
+        int rookMod8 = rookIdx % 8;
+        int rookDiv8 = rookIdx / 8;
+        for (int d1 = -1; d1 <= 1; d1++) {
+            for (int d2 = -1; d2 <= 1; d2++) {
+                if (d1 == d2 || (d1 != 0 && d2 != 0)) continue;
+                for (int j = 1; j < 8; j++) {
+                    int target = rookIdx + d1 * j + d2 * j * 8;
+                    if (!(target % 8 == rookMod8 + d1 * j && target / 8 == rookDiv8 + d2 * j))
+                        break;
+                    if (target == targetIdx)
+                        return true;
+                    if (target < 0 || target > 63 || board[target] != 0) break;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isQueenAttacking(int queenIdx, int targetIdx,  int[] board) {
+        int queenMod8 = queenIdx % 8;
+        int queenDiv8 = queenIdx / 8;
+        for (int d1 = -1; d1 <= 1; d1++) {
+            for (int d2 = -1; d2 <= 1; d2++) {
+                if (d1 == 0 && d2 == 0) continue;
+                for (int j = 1; j < 8; j++) {
+                    int target = queenIdx + d1 * j + d2 * j * 8;
+                    if (!(target % 8 == queenMod8 + d1 * j && target / 8 == queenDiv8 + d2 * j))
+                        break;
+                    if (target == targetIdx)
+                        return true;
+                    if (target < 0 || target > 63 || board[target] != 0) break;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isKingAttacking(int kingIdx, int targetIdx) {
+        for (int j = -1; j <= 1; j++) {
+            for (int k = -1; k <= 1; k++) {
+                int destination = kingIdx + j * 8 + k;
+                if (destination == targetIdx && kingIdx % 8 + k == destination % 8) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public void computeMovesPseudoLegal() {
@@ -426,12 +443,13 @@ public class GameState {
     }
 
     private void addMovesForKing(int i) {
+        int idxMod8 = i % 8;
         for (int j = -1; j <= 1; j++) {
             for (int k = -1; k <= 1; k++) {
                 int destination = i + j * 8 + k;
-                if (i % 8 + k == destination % 8 && 0 <= destination && destination < 64 &&
+                if (idxMod8 + k == destination % 8 && 0 <= destination && destination < 64 &&
                         board[destination] * color <= 0) {
-                    addMoveSlot(i, destination);
+                    addMoveSlot(i, destination, 6);
                 }
             }
         }
@@ -448,10 +466,12 @@ public class GameState {
     }
 
     private void addSlidingMoves(int i, int direction1, int direction2) {
+        int idxMod8 = i % 8;
+        int idxDiv8 = i / 8;
         for (int j = 1; j < 8; j++) {
             int target = i + direction1 * j + direction2 * j * 8;
-            if (!(0 <= target && target < 64 && target % 8 == i % 8 + direction1 * j &&
-                    target / 8 == i / 8 + direction2 * j))
+            if (!(0 <= target && target < 64 && target % 8 == idxMod8 + direction1 * j &&
+                    target / 8 == idxDiv8 + direction2 * j))
                 break;
             int targetPieceType = board[target] * color;
             if (targetPieceType == 0) {
@@ -490,13 +510,18 @@ public class GameState {
     }
 
     private void addMovesForKnight(int i) {
+        int idxMod8 = i % 8;
+        int target;
+        int targetMod8;
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
-                int target = i + j * 8 + k;
-                if (i % 8 + k == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
+                target = i + j * 8 + k;
+                targetMod8 = target % 8;
+                if (idxMod8 + k == targetMod8 && 0 <= target && target < 64 && board[target] * color <= 0)
                     addMoveSlot(i, target);
                 target = i + j + k * 8;
-                if (i % 8 + j == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
+                targetMod8 = target % 8;
+                if (idxMod8 + j == targetMod8 && 0 <= target && target < 64 && board[target] * color <= 0)
                     addMoveSlot(i, target);
             }
         }
