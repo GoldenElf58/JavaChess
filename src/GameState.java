@@ -92,6 +92,8 @@ public class GameState {
             for (int i = 0; i < 64; i++) {
                 int pieceType = newBoard[i] * color;
                 switch (pieceType) {
+                    case 0:
+                        break;
                     case -1:
                         illegal = isPawnAttacking(i, kingIdx);
                         break;
@@ -228,9 +230,8 @@ public class GameState {
         for (int j = -1; j <= 1; j++) {
             for (int k = -1; k <= 1; k++) {
                 int destination = kingIdx + j * 8 + k;
-                if (destination == targetIdx && kingIdx % 8 + k == destination % 8) {
+                if (destination == targetIdx && kingIdx % 8 + k == destination % 8)
                     return true;
-                }
             }
         }
         return false;
