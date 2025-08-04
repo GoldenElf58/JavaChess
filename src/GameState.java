@@ -69,14 +69,15 @@ public class GameState {
         int[] newMoves = new int[moveCount * 3];
         int newMoveCount = 0;
         int[] move;
+        int currKingIdx = -1;
         int kingIdx = -1;
         for (int i = 0; i < 64; i++) {
             if (board[i] == 6 * color) {
-                kingIdx = i;
+                currKingIdx = i;
                 break;
             }
         }
-        if (kingIdx == -1) return;
+        if (currKingIdx == -1) return;
         for (int moveIdx = 0; moveIdx < moveCount; moveIdx++) {
             move = getMove(moveIdx);
             newBoard = makeMoveOnlyBoard(move);
@@ -88,7 +89,7 @@ public class GameState {
                         break;
                     }
                 }
-            }
+            } else kingIdx = currKingIdx;
             for (int i = 0; i < 64; i++) {
                 int pieceType = newBoard[i] * color;
                 switch (pieceType) {
@@ -115,22 +116,6 @@ public class GameState {
                 }
                 if (illegal) break;
             }
-//            gameState.computeMovesNoCheck();
-//            legal = true;
-//            for (int j = 0; j < gameState.moveCount; j++) {
-//                newBoard = gameState.makeMoveOnlyBoard(gameState.getMove(j));
-//                kingPresent = false;
-//                for (int piece : newBoard) {
-//                    if (piece == 6 * color) {
-//                        kingPresent = true;
-//                        break;
-//                    }
-//                }
-//                if (!kingPresent) {
-//                    legal = false;
-//                    break;
-//                }
-//            }
             if (!illegal) {
                 newMoves[newMoveCount * 3] = move[0];
                 newMoves[newMoveCount * 3 + 1] = move[1];
@@ -186,7 +171,7 @@ public class GameState {
         int rookDiv8 = rookIdx / 8;
         for (int d1 = -1; d1 <= 1; d1 += 2) {
             for (int j = 1; j < 8; j++) {
-                int target = rookIdx + d1 * j * j * 8;
+                int target = rookIdx + d1 * j;
                 if (!(target % 8 == rookMod8 + d1 * j && target / 8 == rookDiv8))
                     break;
                 if (target == targetIdx)
@@ -520,16 +505,13 @@ public class GameState {
     private void addMovesForKnight(int i) {
         int idxMod8 = i % 8;
         int target;
-        int targetMod8;
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
                 target = i + j * 8 + k;
-                targetMod8 = target % 8;
-                if (idxMod8 + k == targetMod8 && 0 <= target && target < 64 && board[target] * color <= 0)
+                if (idxMod8 + k == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
                     addMoveSlot(i, target);
                 target = i + j + k * 8;
-                targetMod8 = target % 8;
-                if (idxMod8 + j == targetMod8 && 0 <= target && target < 64 && board[target] * color <= 0)
+                if (idxMod8 + j == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
                     addMoveSlot(i, target);
             }
         }
