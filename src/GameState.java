@@ -182,23 +182,30 @@ public class GameState {
     private boolean isRookAttacking(int rookIdx, int targetIdx, int[] board) {
         int rookMod8 = rookIdx % 8;
         int rookDiv8 = rookIdx / 8;
-        for (int d1 = -1; d1 <= 1; d1++) {
-            for (int d2 = -1; d2 <= 1; d2++) {
-                if (d1 == d2 || (d1 != 0 && d2 != 0)) continue;
-                for (int j = 1; j < 8; j++) {
-                    int target = rookIdx + d1 * j + d2 * j * 8;
-                    if (!(target % 8 == rookMod8 + d1 * j && target / 8 == rookDiv8 + d2 * j))
-                        break;
-                    if (target == targetIdx)
-                        return true;
-                    if (target < 0 || target > 63 || board[target] != 0) break;
-                }
+        for (int d1 = -1; d1 <= 1; d1 += 2) {
+            for (int j = 1; j < 8; j++) {
+                int target = rookIdx + d1 * j * j * 8;
+                if (!(target % 8 == rookMod8 + d1 * j && target / 8 == rookDiv8))
+                    break;
+                if (target == targetIdx)
+                    return true;
+                if (target < 0 || target > 63 || board[target] != 0) break;
+            }
+        }
+        for (int d2 = -1; d2 <= 1; d2 += 2) {
+            for (int j = 1; j < 8; j++) {
+                int target = rookIdx + d2 * j * 8;
+                if (!(target % 8 == rookMod8 && target / 8 == rookDiv8 + d2 * j))
+                    break;
+                if (target == targetIdx)
+                    return true;
+                if (target < 0 || target > 63 || board[target] != 0) break;
             }
         }
         return false;
     }
 
-    private boolean isQueenAttacking(int queenIdx, int targetIdx,  int[] board) {
+    private boolean isQueenAttacking(int queenIdx, int targetIdx, int[] board) {
         int queenMod8 = queenIdx % 8;
         int queenDiv8 = queenIdx / 8;
         for (int d1 = -1; d1 <= 1; d1++) {
