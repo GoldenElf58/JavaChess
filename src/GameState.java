@@ -64,7 +64,7 @@ public class GameState {
     public void computeMoves() {
         if (moveCount != 0) return;
         computeMovesPseudoLegal();
-        int[] newBoard;
+        int pieceTaken;
         boolean illegal;
         int[] newMoves = new int[moveCount * 3];
         int newMoveCount = 0;
@@ -82,13 +82,13 @@ public class GameState {
         boolean inCheckByNonSlidingPiece = inCheckByNonSlidingPiece(currKingIdx);
         for (int moveIdx = 0; moveIdx < moveCount; moveIdx++) {
             move = getMove(moveIdx);
-            newBoard = makeMoveOnlyBoard(move);
+            pieceTaken = makeMoveOnlyBoard(move);
             illegal = false;
             if (move[0] == -1) {
                 int throughIdx = currKingIdx + move[2];
                 kingIdx = throughIdx + move[2];
                 for (int i = 0; i < 64; i++) {
-                    int pieceType = newBoard[i] * color;
+                    int pieceType = board[i] * color;
                     switch (pieceType) {
                         case 0:
                             break;
@@ -99,13 +99,13 @@ public class GameState {
                             illegal = isKnightAttacking(i, kingIdx, currKingIdx, throughIdx);
                             break;
                         case -3:
-                            illegal = isBishopAttacking(i, kingIdx, currKingIdx, throughIdx, newBoard);
+                            illegal = isBishopAttacking(i, kingIdx, currKingIdx, throughIdx, board);
                             break;
                         case -4:
-                            illegal = isRookAttacking(i, kingIdx, currKingIdx, throughIdx, newBoard);
+                            illegal = isRookAttacking(i, kingIdx, currKingIdx, throughIdx, board);
                             break;
                         case -5:
-                            illegal = isQueenAttacking(i, kingIdx, currKingIdx, throughIdx, newBoard);
+                            illegal = isQueenAttacking(i, kingIdx, currKingIdx, throughIdx, board);
                             break;
                         case -6:
                             illegal = isKingAttacking(i, kingIdx, currKingIdx, throughIdx);
@@ -117,7 +117,7 @@ public class GameState {
                 kingMoved = move[2] == 6;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
                 for (int i = 0; i < 64; i++) {
-                    int pieceType = newBoard[i] * color;
+                    int pieceType = board[i] * color;
                     switch (pieceType) {
                         case 0:
                             break;
@@ -128,13 +128,13 @@ public class GameState {
                             if (kingMoved || inCheckByNonSlidingPiece) illegal = isKnightAttacking(i, kingIdx);
                             break;
                         case -3:
-                            illegal = isBishopAttacking(i, kingIdx, newBoard);
+                            illegal = isBishopAttacking(i, kingIdx, board);
                             break;
                         case -4:
-                            illegal = isRookAttacking(i, kingIdx, newBoard);
+                            illegal = isRookAttacking(i, kingIdx, board);
                             break;
                         case -5:
-                            illegal = isQueenAttacking(i, kingIdx, newBoard);
+                            illegal = isQueenAttacking(i, kingIdx, board);
                             break;
                         case -6:
                             if (kingMoved || inCheckByNonSlidingPiece) illegal = isKingAttacking(i, kingIdx);
@@ -143,6 +143,7 @@ public class GameState {
                     if (illegal) break;
                 }
             }
+            undoMoveOnlyBoard(move, pieceTaken);
             if (!illegal) {
                 newMoves[newMoveCount * 3] = move[0];
                 newMoves[newMoveCount * 3 + 1] = move[1];
@@ -516,44 +517,80 @@ public class GameState {
                 !whiteMove, new HashMap<>());
     }
 
-    private int[] makeMoveOnlyBoard(int[] move) {
-        int[] newBoard = board.clone();
-
+    private int makeMoveOnlyBoard(int[] move) {
         // Castle
         if (move[0] == -1) {
-            newBoard[move[1] + move[2] * 2] = 6 * color;
-            newBoard[move[1] + move[2]] = 4 * color;
-            newBoard[move[1]] = 0;
-            newBoard[move[1] + (move[2] == 1 ? 3 : -4)] = 0;
-            return newBoard;
+            board[move[1] + move[2] * 2] = 6 * color;
+            board[move[1] + move[2]] = 4 * color;
+            board[move[1]] = 0;
+            board[move[1] + (move[2] == 1 ? 3 : -4)] = 0;
+            return 0;
         }
 
         // Promotion
         if (move[0] == -2) {
-            newBoard[move[1] - 8 * color] = move[2];
-            newBoard[move[1]] = 0;
-            return newBoard;
+            board[move[1] - 8 * color] = move[2];
+            board[move[1]] = 0;
+            return 0;
         }
 
         // En Passant
         if (move[0] == -3) {
-            newBoard[move[1] - color * 8 + move[2]] = color;
-            newBoard[move[1] + move[2]] = 0;
-            newBoard[move[1]] = 0;
-            return newBoard;
+            board[move[1] - color * 8 + move[2]] = color;
+            board[move[1] + move[2]] = 0;
+            board[move[1]] = 0;
+            return -color;
         }
 
         // Promotion Taking
         if (move[0] <= -4) {
-            newBoard[move[2]] = -2 - move[0];
-            newBoard[move[1]] = 0;
-            return newBoard;
+            int pieceTaken = board[move[2]];
+            board[move[2]] = -2 - move[0];
+            board[move[1]] = 0;
+            return pieceTaken;
         }
 
-        newBoard[move[1]] = newBoard[move[0]];
-        newBoard[move[0]] = 0;
+        int pieceTaken = board[move[1]];
+        board[move[1]] = board[move[0]];
+        board[move[0]] = 0;
 
-        return newBoard;
+        return pieceTaken;
+    }
+
+    private void undoMoveOnlyBoard(int[] move, int pieceTaken) {
+        // Castle
+        if (move[0] == -1) {
+            board[move[1] + move[2] * 2] = 0;
+            board[move[1] + move[2]] = 0;
+            board[move[1]] = 6 * color;
+            board[move[1] + (move[2] == 1 ? 3 : -4)] = 4 * color;
+            return;
+        }
+
+        // Promotion
+        if (move[0] == -2) {
+            board[move[1] - 8 * color] = 0;
+            board[move[1]] = color;
+            return;
+        }
+
+        // En Passant
+        if (move[0] == -3) {
+            board[move[1] - color * 8 + move[2]] = 0;
+            board[move[1] + move[2]] = pieceTaken;
+            board[move[1]] = color;
+            return;
+        }
+
+        // Promotion Taking
+        if (move[0] <= -4) {
+            board[move[2]] = pieceTaken;
+            board[move[1]] = color;
+            return;
+        }
+
+        board[move[0]] = board[move[1]];
+        board[move[1]] = pieceTaken;
     }
 
     public boolean isWinner() {
