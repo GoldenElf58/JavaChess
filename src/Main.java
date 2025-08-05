@@ -24,6 +24,6 @@ public class Main {
         System.out.printf("Half moves: %,d%n", halfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
-        System.out.printf("Average time (per half move): %,d ns%n", watch.getElapsedTimeNanos() / halfMoves);
+        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / halfMoves);
     }
 }
