@@ -9,6 +9,24 @@ public class Main {
         int N = 10_000;
         int moveChoice;
         Watch watch = new Watch();
+        for (int i = 0; i < N / 100; i++) {
+            gameState = new GameState();
+            gameState.computeMoves();
+            while (!gameState.isWinner()) {
+                moveChoice = random.nextInt(gameState.getMoveCount());
+                gameState = gameState.makeMove(gameState.getMove(moveChoice));
+                halfMoves++;
+                gameState.computeMoves();
+            }
+            if (i % 10 == 0) System.out.println();
+            System.out.print(switch (gameState.getWinner()) {
+                case 0 -> "   ";
+                case -1 -> "-1 ";
+                case 1 -> "1  ";
+                default -> gameState.getWinner() + "\n\n";
+            });
+        }
+        System.out.println();
         watch.start();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
