@@ -12,7 +12,7 @@ public class Main {
         for (int i = 0; i < N / 100; i++) {
             gameState = new GameState();
             gameState.computeMoves();
-            while (!gameState.isWinner()) {
+            while (gameState.isInProgress()) {
                 moveChoice = random.nextInt(gameState.getMoveCount());
                 gameState = gameState.makeMove(gameState.getMove(moveChoice));
                 halfMoves++;
@@ -31,7 +31,7 @@ public class Main {
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
             gameState.computeMoves();
-            while (!gameState.isWinner()) {
+            while (gameState.isInProgress()) {
                 moveChoice = random.nextInt(gameState.getMoveCount());
                 gameState = gameState.makeMove(gameState.getMove(moveChoice));
                 halfMoves++;

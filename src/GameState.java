@@ -30,6 +30,8 @@ public class GameState {
     private int[] moves = new int[MAX_MOVES * 3];
     private int moveCount = 0;
     private boolean movesGenerated = false;
+    private boolean isWinner;
+    private int winner;
 
     GameState() {
         board = startBoard;
@@ -43,11 +45,14 @@ public class GameState {
         whiteMove = true;
         color = 1;
         previousPositionCount = new HashMap<>();
+        isWinner = false;
+        winner = 0;
     }
 
     GameState(int[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
               boolean blackKing, int[] lastMove, int halfMoves, int halfMoveClock,
-              boolean whiteMove, HashMap<int[], Integer> previousPositionCount) {
+              boolean whiteMove, HashMap<int[], Integer> previousPositionCount, boolean isWinner,
+              int winner) {
         this.board = board;
         this.whiteQueen = whiteQueen;
         this.whiteKing = whiteKing;
@@ -59,6 +64,8 @@ public class GameState {
         this.whiteMove = whiteMove;
         this.color = whiteMove ? 1 : -1;
         this.previousPositionCount = previousPositionCount;
+        this.isWinner = isWinner;
+        this.winner = winner;
     }
 
     public void computeMoves() {
@@ -69,17 +76,11 @@ public class GameState {
         int[] newMoves = new int[moveCount * 3];
         int newMoveCount = 0;
         int[] move;
-        int currKingIdx = -1;
+        int currKingIdx = getKingIdx();
         int kingIdx;
         boolean kingMoved;
-        for (int i = 0; i < 64; i++) {
-            if (board[i] == 6 * color) {
-                currKingIdx = i;
-                break;
-            }
-        }
         if (currKingIdx == -1) return;
-        boolean inCheckByNonSlidingPiece = inCheckByNonSlidingPiece(currKingIdx);
+        boolean inCheck = inCheckByNonSlidingPiece(currKingIdx);
         for (int moveIdx = 0; moveIdx < moveCount; moveIdx++) {
             move = getMove(moveIdx);
             pieceTaken = makeMoveOnlyBoard(move);
@@ -120,10 +121,10 @@ public class GameState {
                         case 0:
                             break;
                         case -1:
-                            if (kingMoved || inCheckByNonSlidingPiece) illegal = isPawnAttacking(i, kingIdx);
+                            if (kingMoved || inCheck) illegal = isPawnAttacking(i, kingIdx);
                             break;
                         case -2:
-                            if (kingMoved || inCheckByNonSlidingPiece) illegal = isKnightAttacking(i, kingIdx);
+                            if (kingMoved || inCheck) illegal = isKnightAttacking(i, kingIdx);
                             break;
                         case -3:
                             illegal = isBishopAttacking(i, kingIdx, board);
@@ -135,7 +136,7 @@ public class GameState {
                             illegal = isQueenAttacking(i, kingIdx, board);
                             break;
                         case -6:
-                            if (kingMoved || inCheckByNonSlidingPiece) illegal = isKingAttacking(i, kingIdx);
+                            if (kingMoved || inCheck) illegal = isKingAttacking(i, kingIdx);
                             break;
                     }
                     if (illegal) break;
@@ -154,12 +155,42 @@ public class GameState {
         moveCount = newMoveCount;
     }
 
+    private int getKingIdx() {
+        for (int i = 0; i < 64; i++) {
+            if (board[i] == 6 * color) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private boolean inCheckByNonSlidingPiece(int kingIdx) {
         boolean inCheck;
         for (int i = 0; i < 64; i++) {
             inCheck = switch (board[i] * color) {
                 case -1 -> isPawnAttacking(i, kingIdx);
                 case -2 -> isKnightAttacking(i, kingIdx);
+                case -6 -> isKingAttacking(i, kingIdx);
+                default -> false;
+            };
+            if (inCheck) return true;
+        }
+        return false;
+    }
+
+    private boolean inCheck() {
+        return inCheck(getKingIdx());
+    }
+
+    private boolean inCheck(int kingIdx) {
+        boolean inCheck;
+        for (int i = 0; i < 64; i++) {
+            inCheck = switch (board[i] * color) {
+                case -1 -> isPawnAttacking(i, kingIdx);
+                case -2 -> isKnightAttacking(i, kingIdx);
+                case -3 -> isBishopAttacking(i, kingIdx, board);
+                case -4 -> isRookAttacking(i, kingIdx, board);
+                case -5 -> isQueenAttacking(i, kingIdx, board);
                 case -6 -> isKingAttacking(i, kingIdx);
                 default -> false;
             };
@@ -255,8 +286,8 @@ public class GameState {
         for (int j = -1; j <= 1; j++) {
             for (int k = -1; k <= 1; k++) {
                 int destination = kingIdx + j * 8 + k;
-                if ((destination == targetIdx1 || destination == targetIdx2 || destination == targetIdx3)
-                        && kingIdx % 8 + k == destination % 8)
+                if ((destination == targetIdx1 || destination == targetIdx2
+                        || destination == targetIdx3) && kingIdx % 8 + k == destination % 8)
                     return true;
             }
         }
@@ -266,10 +297,10 @@ public class GameState {
     private boolean isPawnAttacking(int pawnIdx, int targetIdx1, int targetIdx2, int targetIdx3) {
         int forwardSquare = pawnIdx + 8 * color;
 
-        return ((forwardSquare - 1 == targetIdx1 || forwardSquare - 1 == targetIdx2 || forwardSquare - 1 == targetIdx3)
-                && (forwardSquare - 1 + 8) % 8 != 7) ||
-                ((forwardSquare + 1 == targetIdx1 || forwardSquare + 1 == targetIdx2 || forwardSquare + 1 == targetIdx3)
-                        && (forwardSquare + 1) % 8 != 0);
+        return ((forwardSquare - 1 == targetIdx1 || forwardSquare - 1 == targetIdx2 ||
+                forwardSquare - 1 == targetIdx3) && (forwardSquare - 1 + 8) % 8 != 7) ||
+                ((forwardSquare + 1 == targetIdx1 || forwardSquare + 1 == targetIdx2 ||
+                        forwardSquare + 1 == targetIdx3) && (forwardSquare + 1) % 8 != 0);
     }
 
     private boolean isKnightAttacking(int knightIdx, int targetIdx1, int targetIdx2, int targetIdx3) {
@@ -277,11 +308,11 @@ public class GameState {
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
                 int target = knightIdx + j * 8 + k;
-                if (knightMod8 + k == target % 8 &&
-                        (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)) return true;
+                if (knightMod8 + k == target % 8 && (target == targetIdx1
+                        || target == targetIdx2 || target == targetIdx3)) return true;
                 target = knightIdx + j + k * 8;
-                if (knightMod8 + j == target % 8 &&
-                        (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)) return true;
+                if (knightMod8 + j == target % 8 && (target == targetIdx1
+                        || target == targetIdx2 || target == targetIdx3)) return true;
             }
         }
         return false;
@@ -305,7 +336,8 @@ public class GameState {
         return false;
     }
 
-    private boolean isRookAttacking(int rookIdx, int targetIdx1, int targetIdx2, int targetIdx3, int[] board) {
+    private boolean isRookAttacking(int rookIdx, int targetIdx1, int targetIdx2, int targetIdx3,
+                                    int[] board) {
         int rookMod8 = rookIdx % 8;
         int rookDiv8 = rookIdx / 8;
         for (int d1 = -1; d1 <= 1; d1 += 2) {
@@ -331,7 +363,8 @@ public class GameState {
         return false;
     }
 
-    private boolean isQueenAttacking(int queenIdx, int targetIdx1, int targetIdx2, int targetIdx3, int[] board) {
+    private boolean isQueenAttacking(int queenIdx, int targetIdx1, int targetIdx2, int targetIdx3,
+                                     int[] board) {
         int queenMod8 = queenIdx % 8;
         int queenDiv8 = queenIdx / 8;
         for (int d1 = -1; d1 <= 1; d1++) {
@@ -433,7 +466,7 @@ public class GameState {
             }
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock + 1,
-                    !whiteMove, new HashMap<>());
+                    !whiteMove, new HashMap<>(), false, 0);
         }
 
         // Promotion
@@ -442,7 +475,7 @@ public class GameState {
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>());
+                    !whiteMove, new HashMap<>(), false, 0);
         }
 
         // En Passant
@@ -452,7 +485,7 @@ public class GameState {
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>());
+                    !whiteMove, new HashMap<>(), false, 0);
         }
 
         // Promotion Taking
@@ -461,7 +494,7 @@ public class GameState {
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>());
+                    !whiteMove, new HashMap<>(), false, 0);
         }
 
         int piece = newBoard[move[0]];
@@ -495,7 +528,7 @@ public class GameState {
         if (piece == 1 && abs(move[0] - move[1]) == 16) {
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     move, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>());
+                    !whiteMove, new HashMap<>(), false, 0);
         }
 
         int halfMoveClock = piece == 1 ? 0 : (captured == 0 ? this.halfMoveClock + 1 : 0);
@@ -506,12 +539,12 @@ public class GameState {
             previousPositionCount.put(this.board, positionCount);
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock,
-                    !whiteMove, previousPositionCount);
+                    !whiteMove, previousPositionCount, positionCount >= 3, 0);
         }
 
         return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                 null, halfMoves + 1, 0,
-                !whiteMove, new HashMap<>());
+                !whiteMove, new HashMap<>(), false, 0);
     }
 
     private int makeMoveOnlyBoard(int[] move) {
@@ -590,8 +623,16 @@ public class GameState {
         board[move[1]] = pieceTaken;
     }
 
-    public boolean isWinner() {
-        if (movesGenerated && moveCount == 0) return true;
+    public boolean isInProgress() {
+        if (isWinner) return false;
+        if (halfMoveClock >= 100) {
+            winner = 0;
+            return false;
+        }
+        if (movesGenerated && moveCount == 0) {
+            winner = inCheck() ? -color : 0;
+            return false;
+        }
         boolean hasWhiteKing = false;
         boolean hasBlackKing = false;
         boolean isEmpty = true;
@@ -607,7 +648,15 @@ public class GameState {
                 if (hasBlackKing && hasWhiteKing) break;
             }
         }
-        return !hasWhiteKing || !hasBlackKing || isEmpty;
+        if (hasWhiteKing && !hasBlackKing) winner = 1;
+        else if (!hasWhiteKing && hasBlackKing) winner = -1;
+        else if (isEmpty) winner = 0;
+        isWinner = !hasWhiteKing || !hasBlackKing || isEmpty;
+        return !isWinner;
+    }
+
+    public int getWinner() {
+        return winner;
     }
 
     private void addMovesForKing(int i) {
@@ -627,8 +676,8 @@ public class GameState {
             addMoveSlot(-1, i, 1);
         }
 
-        if (((whiteMove ? whiteQueen : blackQueen)) &&
-                board[i - 1] == 0 && board[i - 2] == 0 && board[i - 3] == 0 && board[i - 4] == 4 * color) {
+        if (((whiteMove ? whiteQueen : blackQueen)) && board[i - 1] == 0 && board[i - 2] == 0 &&
+                board[i - 3] == 0 && board[i - 4] == 4 * color) {
             addMoveSlot(-1, i, -1);
         }
     }
@@ -683,10 +732,12 @@ public class GameState {
         for (int j = -2; j <= 2; j += 4) {
             for (int k = -1; k <= 1; k += 2) {
                 target = i + j * 8 + k;
-                if (idxMod8 + k == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
+                if (idxMod8 + k == target % 8 && 0 <= target && target < 64
+                        && board[target] * color <= 0)
                     addMoveSlot(i, target);
                 target = i + j + k * 8;
-                if (idxMod8 + j == target % 8 && 0 <= target && target < 64 && board[target] * color <= 0)
+                if (idxMod8 + j == target % 8 && 0 <= target && target < 64
+                        && board[target] * color <= 0)
                     addMoveSlot(i, target);
             }
         }
