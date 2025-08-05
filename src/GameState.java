@@ -128,13 +128,13 @@ public class GameState {
                             if (kingMoved || inCheck) illegal = isKnightAttacking(i, kingIdx);
                             break;
                         case -3:
-                            illegal = isBishopAttacking(i, kingIdx, board);
+                            illegal = isBishopAttacking(i, kingIdx);
                             break;
                         case -4:
-                            illegal = isRookAttacking(i, kingIdx, board);
+                            illegal = isRookAttacking(i, kingIdx);
                             break;
                         case -5:
-                            illegal = isQueenAttacking(i, kingIdx, board);
+                            illegal = isQueenAttacking(i, kingIdx);
                             break;
                         case -6:
                             if (kingMoved || inCheck) illegal = isKingAttacking(i, kingIdx);
@@ -189,9 +189,9 @@ public class GameState {
             inCheck = switch (board[i] * color) {
                 case -1 -> isPawnAttacking(i, kingIdx);
                 case -2 -> isKnightAttacking(i, kingIdx);
-                case -3 -> isBishopAttacking(i, kingIdx, board);
-                case -4 -> isRookAttacking(i, kingIdx, board);
-                case -5 -> isQueenAttacking(i, kingIdx, board);
+                case -3 -> isBishopAttacking(i, kingIdx);
+                case -4 -> isRookAttacking(i, kingIdx);
+                case -5 -> isQueenAttacking(i, kingIdx);
                 case -6 -> isKingAttacking(i, kingIdx);
                 default -> false;
             };
@@ -220,67 +220,49 @@ public class GameState {
         return false;
     }
 
-    private boolean isBishopAttacking(int bishopIdx, int targetIdx, int[] board) {
+    private boolean isSlidingPieceAttacking(int slidingIdx, int slidingMod8, int slidingDiv8,
+                                            int targetIdx, int d1, int d2) {
+        for (int j = 1; j < 8; j++) {
+            int target = slidingIdx + d1 * j + d2 * j * 8;
+            if (!(target % 8 == slidingMod8 + d1 * j && target / 8 == slidingDiv8 + d2 * j))
+                break;
+            if (target == targetIdx)
+                return true;
+            if (target < 0 || target > 63 || board[target] != 0) break;
+        }
+        return false;
+    }
+
+    private boolean isBishopAttacking(int bishopIdx, int targetIdx) {
         int bishopMod8 = bishopIdx % 8;
         int bishopDiv8 = bishopIdx / 8;
-        for (int d1 = -1; d1 <= 1; d1 += 2) {
-            for (int d2 = -1; d2 <= 1; d2 += 2) {
-                for (int j = 1; j < 8; j++) {
-                    int target = bishopIdx + d1 * j + d2 * j * 8;
-                    if (!(target % 8 == bishopMod8 + d1 * j && target / 8 == bishopDiv8 + d2 * j))
-                        break;
-                    if (target == targetIdx)
-                        return true;
-                    if (target < 0 || target > 63 || board[target] != 0) break;
-                }
-            }
-        }
-        return false;
+        return isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, 1)
+                || isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, -1)
+                || isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, 1)
+                || isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, -1);
     }
 
-    private boolean isRookAttacking(int rookIdx, int targetIdx, int[] board) {
+    private boolean isRookAttacking(int rookIdx, int targetIdx) {
         int rookMod8 = rookIdx % 8;
         int rookDiv8 = rookIdx / 8;
-        for (int d1 = -1; d1 <= 1; d1 += 2) {
-            for (int j = 1; j < 8; j++) {
-                int target = rookIdx + d1 * j;
-                if (!(target % 8 == rookMod8 + d1 * j && target / 8 == rookDiv8))
-                    break;
-                if (target == targetIdx)
-                    return true;
-                if (target < 0 || target > 63 || board[target] != 0) break;
-            }
-        }
-        for (int d2 = -1; d2 <= 1; d2 += 2) {
-            for (int j = 1; j < 8; j++) {
-                int target = rookIdx + d2 * j * 8;
-                if (!(target % 8 == rookMod8 && target / 8 == rookDiv8 + d2 * j))
-                    break;
-                if (target == targetIdx)
-                    return true;
-                if (target < 0 || target > 63 || board[target] != 0) break;
-            }
-        }
-        return false;
+        return isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 1, 0)
+                || isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, -1, 0)
+                || isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 0, 1)
+                || isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 0, -1);
     }
 
-    private boolean isQueenAttacking(int queenIdx, int targetIdx, int[] board) {
+    private boolean isQueenAttacking(int queenIdx, int targetIdx) {
         int queenMod8 = queenIdx % 8;
         int queenDiv8 = queenIdx / 8;
-        for (int d1 = -1; d1 <= 1; d1++) {
-            for (int d2 = -1; d2 <= 1; d2++) {
-                if (d1 == 0 && d2 == 0) continue;
-                for (int j = 1; j < 8; j++) {
-                    int target = queenIdx + d1 * j + d2 * j * 8;
-                    if (!(target % 8 == queenMod8 + d1 * j && target / 8 == queenDiv8 + d2 * j))
-                        break;
-                    if (target == targetIdx)
-                        return true;
-                    if (target < 0 || target > 63 || board[target] != 0) break;
-                }
-            }
-        }
-        return false;
+        return isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, 1)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, -1)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, 1)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, -1)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, 0)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, 0)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 0, 1)
+                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 0, -1);
+
     }
 
     private boolean isKingAttacking(int kingIdx, int targetIdx1, int targetIdx2, int targetIdx3) {
