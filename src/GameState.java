@@ -88,8 +88,7 @@ public class GameState {
                 int throughIdx = currKingIdx + move[2];
                 kingIdx = throughIdx + move[2];
                 for (int i = 0; i < 64; i++) {
-                    int pieceType = board[i] * color;
-                    switch (pieceType) {
+                    switch (board[i] * color) {
                         case 0:
                             break;
                         case -1:
@@ -117,8 +116,7 @@ public class GameState {
                 kingMoved = move[2] == 6;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
                 for (int i = 0; i < 64; i++) {
-                    int pieceType = board[i] * color;
-                    switch (pieceType) {
+                    switch (board[i] * color) {
                         case 0:
                             break;
                         case -1:
@@ -159,8 +157,7 @@ public class GameState {
     private boolean inCheckByNonSlidingPiece(int kingIdx) {
         boolean inCheck;
         for (int i = 0; i < 64; i++) {
-            int pieceType = board[i] * color;
-            inCheck = switch (pieceType) {
+            inCheck = switch (board[i] * color) {
                 case -1 -> isPawnAttacking(i, kingIdx);
                 case -2 -> isKnightAttacking(i, kingIdx);
                 case -6 -> isKingAttacking(i, kingIdx);
