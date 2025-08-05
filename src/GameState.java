@@ -71,6 +71,7 @@ public class GameState {
         int[] move;
         int currKingIdx = -1;
         int kingIdx;
+        boolean kingMoved;
         for (int i = 0; i < 64; i++) {
             if (board[i] == 6 * color) {
                 currKingIdx = i;
@@ -78,51 +79,53 @@ public class GameState {
             }
         }
         if (currKingIdx == -1) return;
+        boolean inCheckByNonSlidingPiece = inCheckByNonSlidingPiece(currKingIdx);
         for (int moveIdx = 0; moveIdx < moveCount; moveIdx++) {
             move = getMove(moveIdx);
             newBoard = makeMoveOnlyBoard(move);
             illegal = false;
             if (move[0] == -1) {
-                int throughIdx2 = currKingIdx + move[2];
-                kingIdx = throughIdx2 + move[2];
+                int throughIdx = currKingIdx + move[2];
+                kingIdx = throughIdx + move[2];
                 for (int i = 0; i < 64; i++) {
                     int pieceType = newBoard[i] * color;
                     switch (pieceType) {
                         case 0:
                             break;
                         case -1:
-                            illegal = isPawnAttacking(i, kingIdx, currKingIdx, throughIdx2);
+                            illegal = isPawnAttacking(i, kingIdx, currKingIdx, throughIdx);
                             break;
                         case -2:
-                            illegal = isKnightAttacking(i, kingIdx, currKingIdx, throughIdx2);
+                            illegal = isKnightAttacking(i, kingIdx, currKingIdx, throughIdx);
                             break;
                         case -3:
-                            illegal = isBishopAttacking(i, kingIdx, currKingIdx, throughIdx2, newBoard);
+                            illegal = isBishopAttacking(i, kingIdx, currKingIdx, throughIdx, newBoard);
                             break;
                         case -4:
-                            illegal = isRookAttacking(i, kingIdx, currKingIdx, throughIdx2, newBoard);
+                            illegal = isRookAttacking(i, kingIdx, currKingIdx, throughIdx, newBoard);
                             break;
                         case -5:
-                            illegal = isQueenAttacking(i, kingIdx, currKingIdx, throughIdx2, newBoard);
+                            illegal = isQueenAttacking(i, kingIdx, currKingIdx, throughIdx, newBoard);
                             break;
                         case -6:
-                            illegal = isKingAttacking(i, kingIdx, currKingIdx, throughIdx2);
+                            illegal = isKingAttacking(i, kingIdx, currKingIdx, throughIdx);
                             break;
                     }
                     if (illegal) break;
                 }
             } else {
-                kingIdx = move[2] == 6 ? move[1] : currKingIdx;
+                kingMoved = move[2] == 6;
+                kingIdx = kingMoved ? move[1] : currKingIdx;
                 for (int i = 0; i < 64; i++) {
                     int pieceType = newBoard[i] * color;
                     switch (pieceType) {
                         case 0:
                             break;
                         case -1:
-                            illegal = isPawnAttacking(i, kingIdx);
+                            if (kingMoved || inCheckByNonSlidingPiece) illegal = isPawnAttacking(i, kingIdx);
                             break;
                         case -2:
-                            illegal = isKnightAttacking(i, kingIdx);
+                            if (kingMoved || inCheckByNonSlidingPiece) illegal = isKnightAttacking(i, kingIdx);
                             break;
                         case -3:
                             illegal = isBishopAttacking(i, kingIdx, newBoard);
@@ -134,7 +137,7 @@ public class GameState {
                             illegal = isQueenAttacking(i, kingIdx, newBoard);
                             break;
                         case -6:
-                            illegal = isKingAttacking(i, kingIdx);
+                            if (kingMoved || inCheckByNonSlidingPiece) illegal = isKingAttacking(i, kingIdx);
                             break;
                     }
                     if (illegal) break;
@@ -150,6 +153,21 @@ public class GameState {
         moves = newMoves;
         movesGenerated = true;
         moveCount = newMoveCount;
+    }
+
+    private boolean inCheckByNonSlidingPiece(int kingIdx) {
+        boolean inCheck;
+        for (int i = 0; i < 64; i++) {
+            int pieceType = board[i] * color;
+            inCheck = switch (pieceType) {
+                case -1 -> isPawnAttacking(i, kingIdx);
+                case -2 -> isKnightAttacking(i, kingIdx);
+                case -6 -> isKingAttacking(i, kingIdx);
+                default -> false;
+            };
+            if (inCheck) return true;
+        }
+        return false;
     }
 
     private boolean isPawnAttacking(int pawnIdx, int targetIdx) {
