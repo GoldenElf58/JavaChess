@@ -71,6 +71,7 @@ public class GameState {
     public void computeMoves() {
         if (moveCount != 0) return;
         computeMovesPseudoLegal();
+        int[] board = this.board;
         int pieceTaken;
         boolean illegal;
         int[] newMoves = new int[moveCount * 3];
@@ -117,7 +118,7 @@ public class GameState {
                 kingMoved = move[2] == 6;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
                 for (int i = 0; i < 64; i++) {
-                    switch (board[i] * color) {
+                    switch (board[i] * color) { // make board local
                         case 0:
                             break;
                         case -1:
