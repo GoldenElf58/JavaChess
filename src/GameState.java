@@ -220,11 +220,37 @@ public class GameState {
         return false;
     }
 
-    private boolean isSlidingPieceAttacking(int slidingIdx, int slidingMod8, int slidingDiv8,
-                                            int targetIdx, int d1, int d2) {
+    private boolean isDiagonalSlidingPieceAttacking(int pieceIdx, int pieceMod8, int pieceDiv8,
+                                                    int targetIdx, int d1, int d2) {
         for (int j = 1; j < 8; j++) {
-            int target = slidingIdx + d1 * j + d2 * j * 8;
-            if (!(target % 8 == slidingMod8 + d1 * j && target / 8 == slidingDiv8 + d2 * j))
+            int target = pieceIdx + d1 * j + d2 * j * 8;
+            if (!(target % 8 == pieceMod8 + d1 * j && target / 8 == pieceDiv8 + d2 * j))
+                break;
+            if (target == targetIdx)
+                return true;
+            if (target < 0 || target > 63 || board[target] != 0) break;
+        }
+        return false;
+    }
+
+    private boolean isFileSlidingPieceAttacking(int pieceIdx, int pieceMod8, int pieceDiv8,
+                                                int targetIdx, int dir) {
+        for (int j = 1; j < 8; j++) {
+            int target = pieceIdx + dir * j * 8;
+            if (!(target % 8 == pieceMod8 && target / 8 == pieceDiv8 + dir * j))
+                break;
+            if (target == targetIdx)
+                return true;
+            if (target < 0 || target > 63 || board[target] != 0) break;
+        }
+        return false;
+    }
+
+    private boolean isRankSlidingPieceAttacking(int pieceIdx, int pieceMod8, int pieceDiv8,
+                                                int targetIdx, int dir) {
+        for (int j = 1; j < 8; j++) {
+            int target = pieceIdx + dir * j;
+            if (!(target % 8 == pieceMod8 + dir * j && target / 8 == pieceDiv8))
                 break;
             if (target == targetIdx)
                 return true;
@@ -236,32 +262,32 @@ public class GameState {
     private boolean isBishopAttacking(int bishopIdx, int targetIdx) {
         int bishopMod8 = bishopIdx % 8;
         int bishopDiv8 = bishopIdx / 8;
-        return isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, 1)
-                || isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, -1)
-                || isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, 1)
-                || isSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, -1);
+        return isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, 1)
+                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, -1)
+                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, 1)
+                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, -1);
     }
 
     private boolean isRookAttacking(int rookIdx, int targetIdx) {
         int rookMod8 = rookIdx % 8;
         int rookDiv8 = rookIdx / 8;
-        return isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 1, 0)
-                || isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, -1, 0)
-                || isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 0, 1)
-                || isSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 0, -1);
+        return isFileSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 1)
+                || isFileSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, -1)
+                || isRankSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, 1)
+                || isRankSlidingPieceAttacking(rookIdx, rookMod8, rookDiv8, targetIdx, -1);
     }
 
     private boolean isQueenAttacking(int queenIdx, int targetIdx) {
         int queenMod8 = queenIdx % 8;
         int queenDiv8 = queenIdx / 8;
-        return isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, 1)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, -1)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, 1)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, -1)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, 0)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, 0)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 0, 1)
-                || isSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 0, -1);
+        return isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, 1)
+                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, -1)
+                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, 1)
+                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, -1)
+                || isFileSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1)
+                || isFileSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1)
+                || isRankSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1)
+                || isRankSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1);
 
     }
 
