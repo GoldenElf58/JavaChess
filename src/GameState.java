@@ -645,16 +645,44 @@ public class GameState {
         boolean hasWhiteKing = false;
         boolean hasBlackKing = false;
         boolean isEmpty = true;
+        int otherPieces = 0;
+        int whiteKnights = 0;
+        int blackKnights = 0;
+        int whiteBishops = 0;
         for (int piece : board) {
             if (piece == 6) {
                 hasWhiteKing = true;
-                if (hasBlackKing && isEmpty) break;
-            } else if (piece == -6) {
+                if (hasBlackKing && !isEmpty) break;
+                continue;
+            }
+
+            if (piece == -6) {
                 hasBlackKing = true;
-                if (hasWhiteKing && isEmpty) break;
-            } else if (piece != 0) {
+                if (hasWhiteKing && !isEmpty) break;
+                continue;
+            }
+
+            if (piece == 0 || !isEmpty) continue;
+
+            otherPieces++;
+            if (piece == -2) {
+                blackKnights++;
+            } else if (piece == 2) {
+                whiteKnights++;
+            } else if (piece == 3) {
+                whiteBishops++;
+            } else if (piece != -3) {
                 isEmpty = false;
                 if (hasBlackKing && hasWhiteKing) break;
+                continue;
+            }
+            if (otherPieces == 2) {
+                if (!(whiteKnights + blackKnights == 2 || (whiteBishops + whiteKnights == 1))) {
+                    isEmpty = false;
+                    if (hasBlackKing && hasWhiteKing) break;
+                }
+            } else if (otherPieces >= 3) {
+                isEmpty = false;
             }
         }
         if (hasWhiteKing && !hasBlackKing) winner = 1;
@@ -666,6 +694,14 @@ public class GameState {
 
     public int getWinner() {
         return winner;
+    }
+
+    public int[] getBoard() {
+        return board;
+    }
+
+    public int getColor() {
+        return color;
     }
 
     private void addMovesForKing(int i) {
