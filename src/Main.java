@@ -94,7 +94,6 @@ public class Main extends Application {
         AtomicInteger selectedSquare = new AtomicInteger(-1);
         double[] dragPose = {-1, -1};
         boolean[] dragging = {false};
-        // After setting up your squares and adding them to root:
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
@@ -115,11 +114,6 @@ public class Main extends Application {
                         return;
                     }
                     gameStates[0] = gameState.makeMove(move);
-                    gameStates[0].computeMoves();
-                    for (int i = 0; i < gameStates[0].getMoveCount(); i++) {
-                        System.out.println(gameState.moveRepr(gameStates[0].getMove(i)) + " | " +
-                                gameStates[0].moveToString(gameStates[0].getMove(i)));
-                    }
                     selectedSquare.set(-1);
                 });
                 scene.setOnMouseDragged(e -> {
@@ -127,7 +121,6 @@ public class Main extends Application {
                     dragging[0] = true;
                     dragPose[0] = e.getX();
                     dragPose[1] = e.getY();
-//                    System.out.printf("%d %d%n", (int) e.getX(), (int) e.getY());
                 });
                 scene.setOnMouseReleased(_ -> {
                     if (!dragging[0]) return;
@@ -144,12 +137,6 @@ public class Main extends Application {
                         return;
                     }
                     gameStates[0] = gameState.makeMove(move);
-                    gameStates[0].computeMoves();
-                    System.out.println();
-                    for (int i = 0; i < gameStates[0].getMoveCount(); i++) {
-                        System.out.println(gameState.moveRepr(gameStates[0].getMove(i)) + " | " +
-                                gameStates[0].moveToString(gameStates[0].getMove(i)));
-                    }
                     selectedSquare.set(-1);
                 });
                 displayBoard(scene, gameState, squares, pieces, selectedSquare.get(),
