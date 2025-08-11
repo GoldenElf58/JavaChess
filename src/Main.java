@@ -7,12 +7,15 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
 import java.util.Random;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.lang.Math.floorDiv;
 
@@ -20,8 +23,13 @@ public class Main extends Application {
 
     static final Color DARK_COLOR = Color.rgb(181, 136, 99);
     static final Color LIGHT_COLOR = Color.rgb(240, 217, 181);
-    static final Color DARK_SELECTED_COLOR = Color.rgb(211, 116, 79);
-    static final Color LIGHT_SELECTED_COLOR = Color.rgb(245, 157, 131);
+    static final Color DARK_SELECTED_COLOR = Color.rgb(100, 110, 64);
+    static final Color LIGHT_SELECTED_COLOR = Color.rgb(130, 151, 105);
+    static final Color DARK_HOVER_COLOR = Color.rgb(132, 121, 78);
+    static final Color LIGHT_HOVER_COLOR = Color.rgb(174, 177, 135);
+
+    private final Map<Integer, Image> imageCache = new HashMap<>();
+    private static final WritableImage BLANK = new WritableImage(1, 1);
 
     public static void main(String[] args) {
         launch(args);
@@ -75,91 +83,117 @@ public class Main extends Application {
         final GameState[] gameStates = {new GameState()};
 
         Rectangle[] squares = new Rectangle[64];
+        Circle[] circles = new Circle[64];
         ImageView[] pieces = new ImageView[64];
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
         for (int i = 0; i < 64; i++) {
-            squares[i] = new Rectangle((width - height) / 2 + (i % 8) * length,
-                    floorDiv(i, 8) * length, length, length);
+            double x = (width - height) / 2 + (i % 8) * length;
+            squares[i] = new Rectangle(x, floorDiv(i, 8) * length, length, length);
             squares[i].setFill(((i / 8) + (i % 8)) % 2 == 1 ? DARK_COLOR : LIGHT_COLOR);
             pieces[i] = new ImageView(new WritableImage(1, 1));
+            circles[i] = new Circle(x + length / 2, floorDiv(i, 8) * length + length / 2,
+                    length / 8);
+            circles[i].setFill(Color.BLACK);
             root.getChildren().add(squares[i]);
+            root.getChildren().add(circles[i]);
             root.getChildren().add(pieces[i]);
         }
 
         stage.setScene(scene);
         stage.show();
 
+        gameStates[0].computeMoves();
+
         final boolean[] shown = {false};
         AtomicInteger selectedSquare = new AtomicInteger(-1);
-        double[] dragPose = {-1, -1};
+        double[] mousePose = {-1, -1};
         boolean[] dragging = {false};
+        boolean[] firstSelection = {true};
+
+        scene.setOnMousePressed(e -> {
+            GameState gameState = gameStates[0];
+            int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+            boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
+            if (!canSelect) {
+                firstSelection[0] = true;
+                selectedSquare.set(-1);
+                return;
+            }
+            int[] move = findMove(gameState, selectedSquare.get(), square);
+            if (move == null) {
+                dragging[0] = true;
+                mousePose[0] = e.getX();
+                mousePose[1] = e.getY();
+                if (selectedSquare.get() != square) firstSelection[0] = true;
+                scene.setCursor(Cursor.CLOSED_HAND);
+                selectedSquare.set(square);
+                return;
+            }
+            gameStates[0] = gameState.makeMove(move);
+            gameStates[0].computeMoves();
+            firstSelection[0] = true;
+            selectedSquare.set(-1);
+        });
+
+        scene.setOnMouseDragged(e -> {
+            mousePose[0] = e.getX();
+            mousePose[1] = e.getY();
+            dragging[0] = selectedSquare.get() != -1;
+        });
+
+        scene.setOnMouseReleased(_ -> {
+            if (!dragging[0]) return;
+            dragging[0] = false;
+            scene.setCursor(Cursor.DEFAULT);
+            GameState gameState = gameStates[0];
+            int square = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+            boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
+            if (!canSelect) {
+                selectedSquare.set(-1);
+                firstSelection[0] = true;
+                return;
+            }
+            int[] move = findMove(gameState, selectedSquare.get(), square);
+            if (move == null) {
+                if (selectedSquare.get() == square) {
+                    scene.setCursor(Cursor.OPEN_HAND);
+                    selectedSquare.set(firstSelection[0] ? square : -1);
+                    firstSelection[0] = !firstSelection[0];
+                    return;
+                }
+                firstSelection[0] = true;
+                selectedSquare.set(-1);
+                return;
+            }
+            gameStates[0] = gameState.makeMove(move);
+            gameStates[0].computeMoves();
+            selectedSquare.set(-1);
+        });
+
+        scene.setOnMouseMoved(e -> {
+            mousePose[0] = e.getX();
+            mousePose[1] = e.getY();
+            if (dragging[0]) return;
+            GameState gameState = gameStates[0];
+            int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+            if (square != -1 && canSelectSquare(gameState, selectedSquare.get(), square)) {
+                if (selectedSquare.get() == -1) scene.setCursor(Cursor.OPEN_HAND);
+                else {
+                    scene.setCursor(findMove(gameState, selectedSquare.get(), square) == null
+                            ? Cursor.OPEN_HAND : Cursor.HAND);
+                }
+            } else scene.setCursor(Cursor.DEFAULT);
+        });
+
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 GameState gameState = gameStates[0];
-                scene.setOnMousePressed(e -> {
-                    int square = getSquare(scene, (int) e.getX(), (int) e.getY());
-                    boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
-                    if (!canSelect) {
-                        selectedSquare.set(-1);
-                        return;
-                    }
-                    int[] move = findMove(gameState, selectedSquare.get(), square);
-                    if (move == null) {
-                        dragging[0] = true;
-                        dragPose[0] = e.getX();
-                        dragPose[1] = e.getY();
-                        scene.setCursor(Cursor.CLOSED_HAND);
-                        selectedSquare.set(square);
-                        return;
-                    }
-                    gameStates[0] = gameState.makeMove(move);
-                    selectedSquare.set(-1);
-                });
-                scene.setOnMouseDragged(e -> {
-                    if (selectedSquare.get() == -1) return;
-                    dragging[0] = true;
-                    dragPose[0] = e.getX();
-                    dragPose[1] = e.getY();
-                });
-                scene.setOnMouseReleased(_ -> {
-                    if (!dragging[0]) return;
-                    dragging[0] = false;
-                    scene.setCursor(Cursor.DEFAULT);
-                    int square = getSquare(scene, (int) dragPose[0], (int) dragPose[1]);
-                    boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
-                    if (!canSelect) {
-                        selectedSquare.set(-1);
-                        return;
-                    }
-                    int[] move = findMove(gameState, selectedSquare.get(), square);
-                    if (move == null) {
-                        if (selectedSquare.get() == square) {
-                            scene.setCursor(Cursor.OPEN_HAND);
-                            selectedSquare.set(square);
-                            return;
-                        }
-                        selectedSquare.set(-1);
-                        return;
-                    }
-                    gameStates[0] = gameState.makeMove(move);
-                    selectedSquare.set(-1);
-                });
-                scene.setOnMouseMoved(e -> {
-                    if (dragging[0]) return;
-                    int square = getSquare(scene, (int) e.getX(), (int) e.getY());
-                    if (square != -1 && canSelectSquare(gameState, selectedSquare.get(), square)) {
-                        if (selectedSquare.get() == -1) scene.setCursor(Cursor.OPEN_HAND);
-                        else {
-                            scene.setCursor(findMove(gameState, selectedSquare.get(), square) == null
-                                    ? Cursor.OPEN_HAND : Cursor.HAND);
-                        }
-                    } else scene.setCursor(Cursor.DEFAULT);
-                });
-                displayBoard(scene, gameState, squares, pieces, selectedSquare.get(),
-                        dragging[0] ? dragPose : new double[]{-1});
+
+                displayBoard(scene, gameState, squares, circles, pieces, selectedSquare.get(),
+                        mousePose, dragging[0]);
 
                 if (!gameState.isInProgress() && !shown[0]) {
                     System.out.println(gameState);
@@ -178,37 +212,60 @@ public class Main extends Application {
     }
 
     public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
-                             ImageView[] pieces, int selectedSquare, double[] dragPose) {
+                             Circle[] circles, ImageView[] pieces, int selectedSquare,
+                             double[] mousePose, boolean dragging) {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
+        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
         for (int i = 0; i < 64; i++) {
             double x = (width - height) / 2 + (i % 8) * length;
             double y = floorDiv(i, 8) * length;
+            int piece = gameState.getBoard()[i];
             Rectangle sq = squares[i];
             sq.setWidth(length);
             sq.setHeight(length);
             sq.setX(x);
             sq.setY(y);
+
+            circles[i].setFill(Color.TRANSPARENT);
+            circles[i].setCenterX(x + length / 2);
+            circles[i].setCenterY(y + length / 2);
+            circles[i].setRadius(piece == 0 ? length / 7 : length / 1.8);
+            boolean darkSquare = ((i / 8) + (i % 8)) % 2 == 1;
             if (i == selectedSquare) {
-                sq.setFill(((i / 8) + (i % 8)) % 2 == 1 ? DARK_SELECTED_COLOR :
-                        LIGHT_SELECTED_COLOR);
+                sq.setFill(darkSquare ? DARK_SELECTED_COLOR : LIGHT_SELECTED_COLOR);
+            } else if (findMove(gameState, selectedSquare, i) != null) {
+                if (mouseSquare == i) sq.setFill(darkSquare ? DARK_HOVER_COLOR : LIGHT_HOVER_COLOR);
+                else {
+                    if (piece == 0) {
+                        sq.setFill(darkSquare ? DARK_COLOR : LIGHT_COLOR);
+                        circles[i].setFill(darkSquare ? DARK_SELECTED_COLOR : LIGHT_SELECTED_COLOR);
+                    } else {
+                        sq.setFill(darkSquare ? DARK_HOVER_COLOR : LIGHT_HOVER_COLOR);
+                        circles[i].setFill(darkSquare ? DARK_COLOR : LIGHT_COLOR);
+                        circles[i].toBack();
+                        sq.toBack();
+                    }
+                }
             } else {
-                sq.setFill(((i / 8) + (i % 8)) % 2 == 1 ? DARK_COLOR : LIGHT_COLOR);
+                sq.setFill(darkSquare ? DARK_COLOR : LIGHT_COLOR);
             }
 
             ImageView iv = pieces[i];
-            int code = gameState.getBoard()[i];
-            if (code != 0) {
-                var res = getClass().getResource("/piece_images/" + code + ".png");
-                Image img = (res != null) ? new Image(res.toExternalForm())
-                        : new Image(new File("src/piece_images/" + code + ".png")
-                        .toURI().toString());
+            if (piece != 0) {
+                Image img = imageCache.computeIfAbsent(piece, c -> {
+                    var res = getClass().getResource("/piece_images_2/" + c + ".png");
+                    return (res != null) ? new Image(res.toExternalForm()) :
+                            new Image(new File("src/piece_images/" + c + ".png").toURI().toString());
+                });
                 iv.setImage(img);
-            } else iv.setImage(new WritableImage(1, 1));
-            if (dragPose[0] != -1 && i == selectedSquare) {
-                iv.setX(dragPose[0] - length / 2);
-                iv.setY(dragPose[1] - length / 2);
+            } else {
+                iv.setImage(BLANK);
+            }
+            if (i == selectedSquare && dragging) {
+                iv.setX(mousePose[0] - length / 2);
+                iv.setY(mousePose[1] - length / 2);
                 iv.toFront();
             } else {
                 iv.setX(x);
@@ -237,7 +294,6 @@ public class Main extends Application {
 
     private static int[] findMove(GameState gameState, int from, int to) {
         if (to == from || from == -1) return null;
-        gameState.computeMoves();
         for (int i = 0; i < gameState.getMoveCount(); i++) {
             int[] move = gameState.getMove(i);
             if (move[0] >= 0) {
