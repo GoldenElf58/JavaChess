@@ -842,6 +842,15 @@ public class GameState {
         }
     }
 
+    public String moveToString(int[] move) {
+        return String.format("%c%d %c%d", 'a' + move[0] % 8, 8 - move[0] / 8,
+                'a' + move[1] % 8, 8 - move[1] / 8);
+    }
+
+    public String moveRepr(int[] move) {
+        return String.format("(%d, %d, %d)", move[0], move[1], move[2]);
+    }
+
     public String toString() {
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < 8; i++) {

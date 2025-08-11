@@ -26,26 +26,44 @@ public class Main extends Application {
         launch(args);
         GameState gameState;
         Random random = new Random();
-        int halfMoves = 0;
-        int N = 100_000;
+        int N = 10_000;
+        long totalHalfMoves = 0;
+        long[] perGame = new long[N];
         int moveChoice;
         Watch watch = new Watch();
         watch.start();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
             gameState.computeMoves();
+            int movesThisGame = 0;
             while (gameState.isInProgress()) {
                 moveChoice = random.nextInt(gameState.getMoveCount());
                 gameState = gameState.makeMove(gameState.getMove(moveChoice));
-                halfMoves++;
+                movesThisGame++;
                 gameState.computeMoves();
             }
+            perGame[i] = movesThisGame;
+            totalHalfMoves += movesThisGame;
         }
         watch.stop();
-        System.out.printf("Half moves: %,d%n", halfMoves);
+        System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
-        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / halfMoves);
+        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
+
+        double mean = totalHalfMoves / (double) N;
+        double sumSq = 0.0;
+        for (long v : perGame) {
+            double d = v - mean;
+            sumSq += d * d;
+        }
+        double sd = Math.sqrt(sumSq / (N - 1));
+        double margin = 1.96 * sd / Math.sqrt(N);
+        double ciLower = mean - margin;
+        double ciUpper = mean + margin;
+
+        System.out.printf("Average half-moves/game: %.2f%n", mean);
+        System.out.printf("95%% CI (half-moves/game): [%.2f, %.2f]%n", ciLower, ciUpper);
     }
 
     @Override
@@ -72,9 +90,7 @@ public class Main extends Application {
         stage.setScene(scene);
         stage.show();
 
-//        final long[] startTime = {System.currentTimeMillis()};
-//        Random rand = new Random();
-//        final boolean[] shown = {false};
+        final boolean[] shown = {false};
         AtomicInteger selectedSquare = new AtomicInteger(-1);
         // After setting up your squares and adding them to root:
         AnimationTimer gameLoop = new AnimationTimer() {
@@ -84,37 +100,30 @@ public class Main extends Application {
                 scene.setOnMouseClicked(e -> {
                     int square = getSquare(scene, (int) e.getX(), (int) e.getY());
                     boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
-                    if (canSelect) {
-                        int[] move = findMove(gameState, selectedSquare.get(), square);
-                        if (move != null) {
-                            gameStates[0] = gameState.makeMove(move);
-                            for (int i = 0; i < gameState.getMoveCount(); i++) {
-                                int[] move2 = gameState.getMove(i);
-                                for (int j = 0; j < 3; j++) {
-                                    System.out.print(move2[j] + " ");
-                                }
-                                System.out.println();
-                            }
-                            selectedSquare.set(-1);
-                        } else selectedSquare.set(square);
-                    } else selectedSquare.set(-1);
-                    System.out.println("Selected Square: " + selectedSquare.get());
+                    if (!canSelect) {
+                        selectedSquare.set(-1);
+                        return;
+                    }
+                    int[] move = findMove(gameState, selectedSquare.get(), square);
+                    if (move == null) {
+                        selectedSquare.set(square);
+                        return;
+                    }
+                    gameStates[0] = gameState.makeMove(move);
+                    gameStates[0].computeMoves();
+                    for (int i = 0; i < gameStates[0].getMoveCount(); i++) {
+                        System.out.println(gameState.moveRepr(gameStates[0].getMove(i)) + " | " +
+                                gameStates[0].moveToString(gameStates[0].getMove(i)));
+                    }
+                    selectedSquare.set(-1);
                 });
                 displayBoard(scene, gameState, squares, pieces, selectedSquare.get());
 
-//                if (System.currentTimeMillis() - startTime[0] > 5 && gameState.isInProgress()) {
-//                    startTime[0] = System.currentTimeMillis();
-//                    gameState.computeMoves();
-//                    gameState = gameState.makeMove(gameState.getMove(rand.nextInt(
-//                            gameState.getMoveCount())));
-//                }
-//                if (!gameState.isInProgress() && !shown[0]) {
-//                    System.out.println(gameState);
-//                    System.out.println(gameState.getWinner());
-//                    System.out.println(gameState.getMoveCount());
-//                    System.out.println(gameState.getColor());
-//                    shown[0] = true;
-//                }
+                if (!gameState.isInProgress() && !shown[0]) {
+                    System.out.println(gameState);
+                    System.out.println("Winner: " + gameState.getWinner());
+                    shown[0] = true;
+                }
             }
         };
         gameLoop.start();
@@ -168,11 +177,12 @@ public class Main extends Application {
     public static boolean canSelectSquare(GameState gameState, int from, int to) {
         boolean isColor = gameState.getBoard()[to] * gameState.getColor() > 0;
         if (isColor) return true;
-        if (to == from) return false;
+        if (to == from || !gameState.isInProgress()) return false;
         return findMove(gameState, from, to) != null;
     }
 
     private static int[] findMove(GameState gameState, int from, int to) {
+        if (to == from || from == -1) return null;
         gameState.computeMoves();
         for (int i = 0; i < gameState.getMoveCount(); i++) {
             int[] move = gameState.getMove(i);
