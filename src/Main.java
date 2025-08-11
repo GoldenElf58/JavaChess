@@ -96,10 +96,16 @@ public class Main extends Application {
             circles[i] = new Circle(x + length / 2, floorDiv(i, 8) * length + length / 2,
                     length / 8);
             circles[i].setFill(Color.BLACK);
-            root.getChildren().add(squares[i]);
-            root.getChildren().add(circles[i]);
-            root.getChildren().add(pieces[i]);
         }
+        root.getChildren().addAll(squares);
+        root.getChildren().addAll(circles);
+        root.getChildren().addAll(pieces);
+
+        Rectangle[] borders = {
+                new Rectangle(0, 0, (width - height) / 2, height),
+                new Rectangle(width - (width - height) / 2, 0, (width - height) / 2, height),
+        };
+        root.getChildren().addAll(borders);
 
         stage.setScene(scene);
         stage.show();
@@ -194,6 +200,13 @@ public class Main extends Application {
 
                 displayBoard(scene, gameState, squares, circles, pieces, selectedSquare.get(),
                         mousePose, dragging[0]);
+                double width = scene.getWidth();
+                double height = scene.getHeight();
+                borders[0].setHeight(scene.getHeight());
+                borders[0].setWidth((width - height) / 2);
+                borders[1].setHeight(scene.getHeight());
+                borders[1].setWidth((width - height) / 2);
+                borders[1].setX(width - (width - height) / 2);
 
                 if (!gameState.isInProgress() && !shown[0]) {
                     System.out.println(gameState);
@@ -209,6 +222,18 @@ public class Main extends Application {
             }
         };
         gameLoop.start();
+    }
+
+    public static Color getBaseColor(boolean light) {
+        return light ? LIGHT_COLOR : DARK_COLOR;
+    }
+
+    public static Color getSelectedColor(boolean light) {
+        return light ? LIGHT_SELECTED_COLOR : DARK_SELECTED_COLOR;
+    }
+
+    public static Color getHoverColor(boolean light) {
+        return light ? LIGHT_HOVER_COLOR : DARK_HOVER_COLOR;
     }
 
     public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
@@ -232,37 +257,27 @@ public class Main extends Application {
             circles[i].setCenterX(x + length / 2);
             circles[i].setCenterY(y + length / 2);
             circles[i].setRadius(piece == 0 ? length / 7 : length / 1.8);
-            boolean darkSquare = ((i / 8) + (i % 8)) % 2 == 1;
+            boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
             if (i == selectedSquare) {
-                sq.setFill(darkSquare ? DARK_SELECTED_COLOR : LIGHT_SELECTED_COLOR);
+                sq.setFill(getSelectedColor(lightSquare));
             } else if (findMove(gameState, selectedSquare, i) != null) {
-                if (mouseSquare == i) sq.setFill(darkSquare ? DARK_HOVER_COLOR : LIGHT_HOVER_COLOR);
+                if (mouseSquare == i) sq.setFill(getHoverColor(lightSquare));
                 else {
                     if (piece == 0) {
-                        sq.setFill(darkSquare ? DARK_COLOR : LIGHT_COLOR);
-                        circles[i].setFill(darkSquare ? DARK_SELECTED_COLOR : LIGHT_SELECTED_COLOR);
+                        sq.setFill(getBaseColor(lightSquare));
+                        circles[i].setFill(getSelectedColor(lightSquare));
                     } else {
-                        sq.setFill(darkSquare ? DARK_HOVER_COLOR : LIGHT_HOVER_COLOR);
-                        circles[i].setFill(darkSquare ? DARK_COLOR : LIGHT_COLOR);
+                        sq.setFill(getHoverColor(lightSquare));
+                        circles[i].setFill(getBaseColor(lightSquare));
                         circles[i].toBack();
                         sq.toBack();
                     }
                 }
-            } else {
-                sq.setFill(darkSquare ? DARK_COLOR : LIGHT_COLOR);
-            }
+            } else sq.setFill(getBaseColor(lightSquare));
 
             ImageView iv = pieces[i];
-            if (piece != 0) {
-                Image img = imageCache.computeIfAbsent(piece, c -> {
-                    var res = getClass().getResource("/piece_images_2/" + c + ".png");
-                    return (res != null) ? new Image(res.toExternalForm()) :
-                            new Image(new File("src/piece_images/" + c + ".png").toURI().toString());
-                });
-                iv.setImage(img);
-            } else {
-                iv.setImage(BLANK);
-            }
+            iv.setImage(piece == 0 ? BLANK : imageCache.computeIfAbsent(piece, c ->
+                    new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
             if (i == selectedSquare && dragging) {
                 iv.setX(mousePose[0] - length / 2);
                 iv.setY(mousePose[1] - length / 2);
@@ -302,7 +317,8 @@ public class Main extends Application {
                 }
             } else {
                 if (move[0] == -1) {
-                    if (move[1] == from && (to == from + move[2] * 2 || to == from + move[2] * 3))
+                    if (move[1] == from && (to == from + move[2] * 2 ||
+                            (move[2] == 1 ? to == from + 3 : to == from - 4)))
                         return move;
                 } else if (move[0] == -2) {
                     if (move[1] == from && from - 8 * gameState.getColor() == to) return move;
