@@ -499,7 +499,7 @@ public class GameState {
 
         // Promotion Taking
         if (move[0] <= -4) {
-            newBoard[move[2]] = -2 - move[0];
+            newBoard[move[2]] = (-2 - move[0]) * color;
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0,
@@ -534,7 +534,7 @@ public class GameState {
             }
         }
 
-        if (piece == 1 && abs(move[0] - move[1]) == 16) {
+        if ((piece == 1 || piece == -1) && abs(move[0] - move[1]) == 16) {
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     move, halfMoves + 1, 0,
                     !whiteMove, new HashMap<>(), false, 0);
