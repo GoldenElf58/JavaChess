@@ -92,12 +92,14 @@ public class Main extends Application {
 
         final boolean[] shown = {false};
         AtomicInteger selectedSquare = new AtomicInteger(-1);
+        double[] dragPose = {-1, -1};
+        boolean[] dragging = {false};
         // After setting up your squares and adding them to root:
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 GameState gameState = gameStates[0];
-                scene.setOnMouseClicked(e -> {
+                scene.setOnMousePressed(e -> {
                     int square = getSquare(scene, (int) e.getX(), (int) e.getY());
                     boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
                     if (!canSelect) {
@@ -106,6 +108,9 @@ public class Main extends Application {
                     }
                     int[] move = findMove(gameState, selectedSquare.get(), square);
                     if (move == null) {
+                        dragging[0] = true;
+                        dragPose[0] = e.getX();
+                        dragPose[1] = e.getY();
                         selectedSquare.set(square);
                         return;
                     }
@@ -117,11 +122,48 @@ public class Main extends Application {
                     }
                     selectedSquare.set(-1);
                 });
-                displayBoard(scene, gameState, squares, pieces, selectedSquare.get());
+                scene.setOnMouseDragged(e -> {
+                    if (selectedSquare.get() == -1) return;
+                    dragging[0] = true;
+                    dragPose[0] = e.getX();
+                    dragPose[1] = e.getY();
+//                    System.out.printf("%d %d%n", (int) e.getX(), (int) e.getY());
+                });
+                scene.setOnMouseReleased(_ -> {
+                    if (!dragging[0]) return;
+                    dragging[0] = false;
+                    int square = getSquare(scene, (int) dragPose[0], (int) dragPose[1]);
+                    boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
+                    if (!canSelect) {
+                        selectedSquare.set(-1);
+                        return;
+                    }
+                    int[] move = findMove(gameState, selectedSquare.get(), square);
+                    if (move == null) {
+                        selectedSquare.set(selectedSquare.get() == square ? square : -1);
+                        return;
+                    }
+                    gameStates[0] = gameState.makeMove(move);
+                    gameStates[0].computeMoves();
+                    System.out.println();
+                    for (int i = 0; i < gameStates[0].getMoveCount(); i++) {
+                        System.out.println(gameState.moveRepr(gameStates[0].getMove(i)) + " | " +
+                                gameStates[0].moveToString(gameStates[0].getMove(i)));
+                    }
+                    selectedSquare.set(-1);
+                });
+                displayBoard(scene, gameState, squares, pieces, selectedSquare.get(),
+                        dragging[0] ? dragPose : new double[]{-1});
 
                 if (!gameState.isInProgress() && !shown[0]) {
                     System.out.println(gameState);
-                    System.out.println("Winner: " + gameState.getWinner());
+                    System.out.printf((switch (gameState.getWinner()) {
+                        case 0 -> "Draw";
+                        case 1 -> "White wins";
+                        case -1 -> "Black wins";
+                        default ->
+                                throw new IllegalStateException("Unexpected value: " + gameState.getWinner());
+                    }));
                     shown[0] = true;
                 }
             }
@@ -130,7 +172,7 @@ public class Main extends Application {
     }
 
     public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
-                             ImageView[] pieces, int selectedSquare) {
+                             ImageView[] pieces, int selectedSquare, double[] dragPose) {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
@@ -158,8 +200,14 @@ public class Main extends Application {
                         .toURI().toString());
                 iv.setImage(img);
             } else iv.setImage(new WritableImage(1, 1));
-            iv.setX(x);
-            iv.setY(y);
+            if (dragPose[0] != -1 && i == selectedSquare) {
+                iv.setX(dragPose[0] - length / 2);
+                iv.setY(dragPose[1] - length / 2);
+                iv.toFront();
+            } else {
+                iv.setX(x);
+                iv.setY(y);
+            }
             iv.setFitWidth(length);
             iv.setFitHeight(length);
         }
