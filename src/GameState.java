@@ -599,10 +599,11 @@ public class GameState {
     private void undoMoveOnlyBoard(int[] move, int pieceTaken) {
         // Castle
         if (move[0] == -1) {
-            board[move[1] + move[2] * 2] = 0;
-            board[move[1] + move[2]] = 0;
-            board[move[1]] = 6 * color;
-            board[move[1] + (move[2] == 1 ? 3 : -4)] = 4 * color;
+            int move_1 = move[1];
+            board[move_1 + move[2] * 2] = 0;
+            board[move_1 + move[2]] = 0;
+            board[move_1] = 6 * color;
+            board[move_1 + (move[2] == 1 ? 3 : -4)] = 4 * color;
             return;
         }
 
