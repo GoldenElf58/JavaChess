@@ -1,5 +1,6 @@
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
@@ -110,6 +111,7 @@ public class Main extends Application {
                         dragging[0] = true;
                         dragPose[0] = e.getX();
                         dragPose[1] = e.getY();
+                        scene.setCursor(Cursor.CLOSED_HAND);
                         selectedSquare.set(square);
                         return;
                     }
@@ -125,6 +127,7 @@ public class Main extends Application {
                 scene.setOnMouseReleased(_ -> {
                     if (!dragging[0]) return;
                     dragging[0] = false;
+                    scene.setCursor(Cursor.DEFAULT);
                     int square = getSquare(scene, (int) dragPose[0], (int) dragPose[1]);
                     boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
                     if (!canSelect) {
@@ -133,11 +136,27 @@ public class Main extends Application {
                     }
                     int[] move = findMove(gameState, selectedSquare.get(), square);
                     if (move == null) {
-                        selectedSquare.set(selectedSquare.get() == square ? square : -1);
+                        if (selectedSquare.get() == square) {
+                            scene.setCursor(Cursor.OPEN_HAND);
+                            selectedSquare.set(square);
+                            return;
+                        }
+                        selectedSquare.set(-1);
                         return;
                     }
                     gameStates[0] = gameState.makeMove(move);
                     selectedSquare.set(-1);
+                });
+                scene.setOnMouseMoved(e -> {
+                    if (dragging[0]) return;
+                    int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+                    if (square != -1 && canSelectSquare(gameState, selectedSquare.get(), square)) {
+                        if (selectedSquare.get() == -1) scene.setCursor(Cursor.OPEN_HAND);
+                        else {
+                            scene.setCursor(findMove(gameState, selectedSquare.get(), square) == null
+                                    ? Cursor.OPEN_HAND : Cursor.HAND);
+                        }
+                    } else scene.setCursor(Cursor.DEFAULT);
                 });
                 displayBoard(scene, gameState, squares, pieces, selectedSquare.get(),
                         dragging[0] ? dragPose : new double[]{-1});
