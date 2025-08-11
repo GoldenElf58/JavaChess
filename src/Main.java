@@ -33,46 +33,46 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         launch(args);
-        GameState gameState;
-        Random random = new Random();
-        int N = 10_000;
-        long totalHalfMoves = 0;
-        long[] perGame = new long[N];
-        int moveChoice;
-        Watch watch = new Watch();
-        watch.start();
-        for (int i = 0; i < N; i++) {
-            gameState = new GameState();
-            gameState.computeMoves();
-            int movesThisGame = 0;
-            while (gameState.isInProgress()) {
-                moveChoice = random.nextInt(gameState.getMoveCount());
-                gameState = gameState.makeMove(gameState.getMove(moveChoice));
-                movesThisGame++;
-                gameState.computeMoves();
-            }
-            perGame[i] = movesThisGame;
-            totalHalfMoves += movesThisGame;
-        }
-        watch.stop();
-        System.out.printf("Half moves: %,d%n", totalHalfMoves);
-        System.out.printf("Games: %,d%n", N);
-        System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
-        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
-
-        double mean = totalHalfMoves / (double) N;
-        double sumSq = 0.0;
-        for (long v : perGame) {
-            double d = v - mean;
-            sumSq += d * d;
-        }
-        double sd = Math.sqrt(sumSq / (N - 1));
-        double margin = 1.96 * sd / Math.sqrt(N);
-        double ciLower = mean - margin;
-        double ciUpper = mean + margin;
-
-        System.out.printf("Average half-moves/game: %.2f%n", mean);
-        System.out.printf("95%% CI (half-moves/game): [%.2f, %.2f]%n", ciLower, ciUpper);
+//        GameState gameState;
+//        Random random = new Random();
+//        int N = 10_000;
+//        long totalHalfMoves = 0;
+//        long[] perGame = new long[N];
+//        int moveChoice;
+//        Watch watch = new Watch();
+//        watch.start();
+//        for (int i = 0; i < N; i++) {
+//            gameState = new GameState();
+//            gameState.computeMoves();
+//            int movesThisGame = 0;
+//            while (gameState.isInProgress()) {
+//                moveChoice = random.nextInt(gameState.getMoveCount());
+//                gameState = gameState.makeMove(gameState.getMove(moveChoice));
+//                movesThisGame++;
+//                gameState.computeMoves();
+//            }
+//            perGame[i] = movesThisGame;
+//            totalHalfMoves += movesThisGame;
+//        }
+//        watch.stop();
+//        System.out.printf("Half moves: %,d%n", totalHalfMoves);
+//        System.out.printf("Games: %,d%n", N);
+//        System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
+//        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
+//
+//        double mean = totalHalfMoves / (double) N;
+//        double sumSq = 0.0;
+//        for (long v : perGame) {
+//            double d = v - mean;
+//            sumSq += d * d;
+//        }
+//        double sd = Math.sqrt(sumSq / (N - 1));
+//        double margin = 1.96 * sd / Math.sqrt(N);
+//        double ciLower = mean - margin;
+//        double ciUpper = mean + margin;
+//
+//        System.out.printf("Average half-moves/game: %.2f%n", mean);
+//        System.out.printf("95%% CI (half-moves/game): [%.2f, %.2f]%n", ciLower, ciUpper);
     }
 
     @Override
@@ -80,6 +80,8 @@ public class Main extends Application {
         Group root = new Group();
         Scene scene = new Scene(root, 720, 480, Color.grayRgb(0));
         stage.setTitle("Chess");
+        stage.setMinWidth(128);
+        stage.setMinHeight(128);
         final GameState[] gameStates = {new GameState()};
 
         Rectangle[] squares = new Rectangle[64];
@@ -89,10 +91,12 @@ public class Main extends Application {
         double height = scene.getHeight();
         double length = height / 8;
         for (int i = 0; i < 64; i++) {
-            double x = (width - height) / 2 + (i % 8) * length;
+            double x = getX(width, height, i);
             squares[i] = new Rectangle(x, floorDiv(i, 8) * length, length, length);
             squares[i].setFill(((i / 8) + (i % 8)) % 2 == 1 ? DARK_COLOR : LIGHT_COLOR);
             pieces[i] = new ImageView(new WritableImage(1, 1));
+            pieces[i].setX(x);
+            pieces[i].setY(floorDiv(i, 8) * length);
             circles[i] = new Circle(x + length / 2, floorDiv(i, 8) * length + length / 2,
                     length / 8);
             circles[i].setFill(Color.BLACK);
@@ -121,6 +125,7 @@ public class Main extends Application {
         scene.setOnMousePressed(e -> {
             GameState gameState = gameStates[0];
             int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+            if (square == -1) return;
             boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
             if (!canSelect) {
                 firstSelection[0] = true;
@@ -152,9 +157,12 @@ public class Main extends Application {
         scene.setOnMouseReleased(_ -> {
             if (!dragging[0]) return;
             dragging[0] = false;
+            pieces[selectedSquare.get()].setX(getX(scene, selectedSquare.get()));
+            pieces[selectedSquare.get()].setY(getY(scene, selectedSquare.get()));
             scene.setCursor(Cursor.DEFAULT);
             GameState gameState = gameStates[0];
             int square = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+            if (square == -1) return;
             boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
             if (!canSelect) {
                 selectedSquare.set(-1);
@@ -184,14 +192,23 @@ public class Main extends Application {
             if (dragging[0]) return;
             GameState gameState = gameStates[0];
             int square = getSquare(scene, (int) e.getX(), (int) e.getY());
-            if (square != -1 && canSelectSquare(gameState, selectedSquare.get(), square)) {
-                if (selectedSquare.get() == -1) scene.setCursor(Cursor.OPEN_HAND);
-                else {
-                    scene.setCursor(findMove(gameState, selectedSquare.get(), square) == null
-                            ? Cursor.OPEN_HAND : Cursor.HAND);
-                }
-            } else scene.setCursor(Cursor.DEFAULT);
+            if (square == -1 || !canSelectSquare(gameState, selectedSquare.get(), square)) {
+                scene.setCursor(Cursor.DEFAULT);
+                return;
+            }
+            if (selectedSquare.get() == -1) {
+                scene.setCursor(Cursor.OPEN_HAND);
+                return;
+            }
+            scene.setCursor(findMove(gameState, selectedSquare.get(), square) == null ?
+                    Cursor.OPEN_HAND : Cursor.HAND);
         });
+
+        scene.widthProperty().addListener(_ -> updatePositions(scene, squares, circles, pieces,
+                borders));
+        scene.heightProperty().addListener(_ -> updatePositions(scene, squares, circles, pieces,
+                borders));
+        updatePositions(scene, squares, circles, pieces, borders);
 
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
@@ -200,13 +217,6 @@ public class Main extends Application {
 
                 displayBoard(scene, gameState, squares, circles, pieces, selectedSquare.get(),
                         mousePose, dragging[0]);
-                double width = scene.getWidth();
-                double height = scene.getHeight();
-                borders[0].setHeight(scene.getHeight());
-                borders[0].setWidth((width - height) / 2);
-                borders[1].setHeight(scene.getHeight());
-                borders[1].setWidth((width - height) / 2);
-                borders[1].setX(width - (width - height) / 2);
 
                 if (!gameState.isInProgress() && !shown[0]) {
                     System.out.println(gameState);
@@ -224,6 +234,22 @@ public class Main extends Application {
         gameLoop.start();
     }
 
+    public static double getX(Scene scene, int idx) {
+        return getX(scene.getWidth(), scene.getHeight(), idx);
+    }
+
+    public static double getY(Scene scene, int idx) {
+        return getY(scene.getHeight(), idx);
+    }
+
+    public static double getX(double width, double height, int idx) {
+        return (width - height) / 2 + (idx % 8) * height / 8;
+    }
+
+    public static double getY(double height, int idx) {
+        return floorDiv(idx, 8) * height / 8;
+    }
+
     public static Color getBaseColor(boolean light) {
         return light ? LIGHT_COLOR : DARK_COLOR;
     }
@@ -236,34 +262,51 @@ public class Main extends Application {
         return light ? LIGHT_HOVER_COLOR : DARK_HOVER_COLOR;
     }
 
-    public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
-                             Circle[] circles, ImageView[] pieces, int selectedSquare,
-                             double[] mousePose, boolean dragging) {
+    public void updatePositions(Scene scene, Rectangle[] squares, Circle[] circles,
+                                ImageView[] pieces, Rectangle[] borders) {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
-        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+        borders[0].setHeight(scene.getHeight());
+        borders[0].setWidth((width - height) / 2);
+        borders[1].setHeight(scene.getHeight());
+        borders[1].setWidth((width - height) / 2);
+        borders[1].setX(width - (width - height) / 2);
         for (int i = 0; i < 64; i++) {
-            double x = (width - height) / 2 + (i % 8) * length;
-            double y = floorDiv(i, 8) * length;
-            int piece = gameState.getBoard()[i];
+            double x = getX(width, height, i);
+            double y = getY(height, i);
             Rectangle sq = squares[i];
             sq.setWidth(length);
             sq.setHeight(length);
             sq.setX(x);
             sq.setY(y);
-
-            circles[i].setFill(Color.TRANSPARENT);
             circles[i].setCenterX(x + length / 2);
             circles[i].setCenterY(y + length / 2);
-            circles[i].setRadius(piece == 0 ? length / 7 : length / 1.8);
+            pieces[i].setX(x);
+            pieces[i].setY(y);
+            pieces[i].setFitHeight(length);
+            pieces[i].setFitWidth(length);
+        }
+    }
+
+    public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
+                             Circle[] circles, ImageView[] pieces, int selectedSquare,
+                             double[] mousePose, boolean dragging) {
+        double length = scene.getHeight() / 8;
+        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+        for (int i = 0; i < 64; i++) {
+            int pieceType = gameState.getBoard()[i];
+            Rectangle sq = squares[i];
+
+            circles[i].setFill(Color.TRANSPARENT);
+            circles[i].setRadius(pieceType == 0 ? length / 7 : length / 1.8);
             boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
             if (i == selectedSquare) {
                 sq.setFill(getSelectedColor(lightSquare));
             } else if (findMove(gameState, selectedSquare, i) != null) {
                 if (mouseSquare == i) sq.setFill(getHoverColor(lightSquare));
                 else {
-                    if (piece == 0) {
+                    if (pieceType == 0) {
                         sq.setFill(getBaseColor(lightSquare));
                         circles[i].setFill(getSelectedColor(lightSquare));
                     } else {
@@ -275,19 +318,14 @@ public class Main extends Application {
                 }
             } else sq.setFill(getBaseColor(lightSquare));
 
-            ImageView iv = pieces[i];
-            iv.setImage(piece == 0 ? BLANK : imageCache.computeIfAbsent(piece, c ->
+            ImageView piece = pieces[i];
+            piece.setImage(pieceType == 0 ? BLANK : imageCache.computeIfAbsent(pieceType, c ->
                     new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
             if (i == selectedSquare && dragging) {
-                iv.setX(mousePose[0] - length / 2);
-                iv.setY(mousePose[1] - length / 2);
-                iv.toFront();
-            } else {
-                iv.setX(x);
-                iv.setY(y);
+                piece.setX(mousePose[0] - length / 2);
+                piece.setY(mousePose[1] - length / 2);
+                piece.toFront();
             }
-            iv.setFitWidth(length);
-            iv.setFitHeight(length);
         }
     }
 
