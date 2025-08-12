@@ -11,7 +11,6 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
-import java.util.Random;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
@@ -29,7 +28,6 @@ public class Main extends Application {
     static final Color LIGHT_HOVER_COLOR = Color.rgb(174, 177, 135);
 
     private final Map<Integer, Image> imageCache = new HashMap<>();
-    private static final WritableImage BLANK = new WritableImage(1, 1);
 
     public static void main(String[] args) {
         launch(args);
