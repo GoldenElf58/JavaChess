@@ -14,6 +14,9 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 
 import java.io.File;
+import java.util.Random;
+import java.util.Scanner;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,46 +38,79 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         launch(args);
-//        GameState gameState;
-//        Random random = new Random();
-//        int N = 10_000;
-//        long totalHalfMoves = 0;
-//        long[] perGame = new long[N];
-//        int moveChoice;
-//        Watch watch = new Watch();
-//        watch.start();
-//        for (int i = 0; i < N; i++) {
-//            gameState = new GameState();
-//            gameState.computeMoves();
-//            int movesThisGame = 0;
-//            while (gameState.isInProgress()) {
-//                moveChoice = random.nextInt(gameState.getMoveCount());
-//                gameState = gameState.makeMove(gameState.getMove(moveChoice));
-//                movesThisGame++;
-//                gameState.computeMoves();
-//            }
-//            perGame[i] = movesThisGame;
-//            totalHalfMoves += movesThisGame;
-//        }
-//        watch.stop();
-//        System.out.printf("Half moves: %,d%n", totalHalfMoves);
-//        System.out.printf("Games: %,d%n", N);
-//        System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
-//        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
-//
-//        double mean = totalHalfMoves / (double) N;
-//        double sumSq = 0.0;
-//        for (long v : perGame) {
-//            double d = v - mean;
-//            sumSq += d * d;
-//        }
-//        double sd = Math.sqrt(sumSq / (N - 1));
-//        double margin = 1.96 * sd / Math.sqrt(N);
-//        double ciLower = mean - margin;
-//        double ciUpper = mean + margin;
-//
-//        System.out.printf("Average half-moves/game: %.2f%n", mean);
-//        System.out.printf("95%% CI (half-moves/game): [%.2f, %.2f]%n", ciLower, ciUpper);
+        boolean run = askYesWithTimeout("Run benchmark? (y/n) ", 5);
+        if (run) {
+            boolean debug = askYesWithTimeout("Debug mode? (y/n) ", 3);
+            runBenchmark(debug);
+        }
+    }
+
+    private static boolean askYesWithTimeout(String prompt, int seconds) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Scanner scanner = new Scanner(System.in);
+        Future<String> future = executor.submit(scanner::nextLine);
+
+        try {
+            System.out.print(prompt);
+            String input = future.get(seconds, TimeUnit.SECONDS);
+            return input != null && input.equalsIgnoreCase("y");
+        } catch (TimeoutException e) {
+            System.out.println("\nTimed out");
+            future.cancel(true);
+            return false;
+        } catch (ExecutionException | InterruptedException e) {
+            future.cancel(true);
+            return false;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private static void runBenchmark(boolean debug) {
+        GameState gameState;
+        Random random = new Random();
+        int N = 10_000;
+        long totalHalfMoves = 0;
+        long[] perGame = new long[N];
+        int moveChoice;
+        Watch watch = new Watch();
+        watch.start();
+        for (int i = 0; i < N; i++) {
+            gameState = new GameState();
+            gameState.computeMoves();
+            int movesThisGame = 0;
+            while (gameState.isInProgress()) {
+                moveChoice = random.nextInt(gameState.getMoveCount());
+                gameState = gameState.makeMove(gameState.getMove(moveChoice));
+                movesThisGame++;
+                gameState.computeMoves();
+                if (debug) {
+                    System.out.println(gameState);
+                    gameState.printMoves();
+                }
+            }
+            perGame[i] = movesThisGame;
+            totalHalfMoves += movesThisGame;
+        }
+        watch.stop();
+        System.out.printf("Half moves: %,d%n", totalHalfMoves);
+        System.out.printf("Games: %,d%n", N);
+        System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
+        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
+
+        double mean = totalHalfMoves / (double) N;
+        double sumSq = 0.0;
+        for (long v : perGame) {
+            double d = v - mean;
+            sumSq += d * d;
+        }
+        double sd = Math.sqrt(sumSq / (N - 1));
+        double margin = 1.96 * sd / Math.sqrt(N);
+        double ciLower = mean - margin;
+        double ciUpper = mean + margin;
+
+        System.out.printf("Average half-moves/game: %.2f%n", mean);
+        System.out.printf("95%% CI (half-moves/game): [%.2f, %.2f]%n", ciLower, ciUpper);
     }
 
     @Override

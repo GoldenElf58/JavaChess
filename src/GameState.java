@@ -846,13 +846,27 @@ public class GameState {
         }
     }
 
+    public String moveToString(int moveIdx) {
+        return moveToString(getMove(moveIdx));
+    }
+
     public String moveToString(int[] move) {
         return String.format("%c%d %c%d", 'a' + move[0] % 8, 8 - move[0] / 8,
                 'a' + move[1] % 8, 8 - move[1] / 8);
     }
 
+    public String moveRepr(int moveIdx) {
+        return moveRepr(getMove(moveIdx));
+    }
+
     public String moveRepr(int[] move) {
         return String.format("(%d, %d, %d)", move[0], move[1], move[2]);
+    }
+
+    public void printMoves() {
+        for (int i = 0; i < moveCount; i++) {
+            System.out.printf("%s | %s%n", moveRepr(i), moveToString(i));
+        }
     }
 
     public String toString() {
