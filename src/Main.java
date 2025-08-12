@@ -259,8 +259,9 @@ public class Main extends Application {
                         mousePose, dragging[0]);
 
                 if (!gameState.isInProgress() && !shown[0]) {
+                    playSound("game-end");
                     System.out.println(gameState);
-                    System.out.printf((switch (gameState.getWinner()) {
+                    System.out.println((switch (gameState.getWinner()) {
                         case 0 -> "Draw";
                         case 1 -> "White wins";
                         case -1 -> "Black wins";
@@ -275,7 +276,8 @@ public class Main extends Application {
     }
 
     public static void loadSounds() {
-        String[] files = {"move-check", "move-opponent", "move-self", "capture", "castle", "promote"};
+        String[] files = {"move-check", "move-opponent", "move-self", "capture", "castle",
+                "promote", "game-end"};
         for (String file : files) {
             Media media = new Media(new File("src/sounds/" + file + ".mp3").toURI().toString());
             soundCache.put(file, media);
