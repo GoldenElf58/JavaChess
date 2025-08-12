@@ -232,34 +232,6 @@ public class Main extends Application {
         gameLoop.start();
     }
 
-    public static double getX(Scene scene, int idx) {
-        return getX(scene.getWidth(), scene.getHeight(), idx);
-    }
-
-    public static double getY(Scene scene, int idx) {
-        return getY(scene.getHeight(), idx);
-    }
-
-    public static double getX(double width, double height, int idx) {
-        return (width - height) / 2 + (idx % 8) * height / 8;
-    }
-
-    public static double getY(double height, int idx) {
-        return floorDiv(idx, 8) * height / 8;
-    }
-
-    public static Color getBaseColor(boolean light) {
-        return light ? LIGHT_COLOR : DARK_COLOR;
-    }
-
-    public static Color getSelectedColor(boolean light) {
-        return light ? LIGHT_SELECTED_COLOR : DARK_SELECTED_COLOR;
-    }
-
-    public static Color getHoverColor(boolean light) {
-        return light ? LIGHT_HOVER_COLOR : DARK_HOVER_COLOR;
-    }
-
     public void updatePositions(Scene scene, Rectangle[] squares, Circle[] circles,
                                 ImageView[] pieces, Rectangle[] borders) {
         double width = scene.getWidth();
@@ -375,4 +347,31 @@ public class Main extends Application {
         }
         return null;
     }
-}
+
+    public static double getX(Scene scene, int idx) {
+        return getX(scene.getWidth(), scene.getHeight(), idx);
+    }
+
+    public static double getY(Scene scene, int idx) {
+        return getY(scene.getHeight(), idx);
+    }
+
+    public static double getX(double width, double height, int idx) {
+        return (width - height) / 2 + (idx % 8) * height / 8;
+    }
+
+    public static double getY(double height, int idx) {
+        return floorDiv(idx, 8) * height / 8;
+    }
+
+    public static Color getBaseColor(boolean light) {
+        return light ? LIGHT_COLOR : DARK_COLOR;
+    }
+
+    public static Color getSelectedColor(boolean light) {
+        return light ? LIGHT_SELECTED_COLOR : DARK_SELECTED_COLOR;
+    }
+
+    public static Color getHoverColor(boolean light) {
+        return light ? LIGHT_HOVER_COLOR : DARK_HOVER_COLOR;
+    }}
