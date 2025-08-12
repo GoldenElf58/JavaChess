@@ -799,10 +799,10 @@ public class GameState {
 
         if (board[forwardSquare] == 0) {
             if (isPromotion) {
-                addMoveSlot(-2, i, 2 * color); // Knight
-                addMoveSlot(-2, i, 3 * color); // Bishop
-                addMoveSlot(-2, i, 4 * color); // Rook
                 addMoveSlot(-2, i, 5 * color); // Queen
+                addMoveSlot(-2, i, 4 * color); // Rook
+                addMoveSlot(-2, i, 3 * color); // Bishop
+                addMoveSlot(-2, i, 2 * color); // Knight
             } else {
                 addMoveSlot(i, forwardSquare); // normal move
                 if ((whiteMove ? i / 8 == 6 : i / 8 == 1) && board[i - 16 * color] == 0) {
@@ -814,10 +814,10 @@ public class GameState {
         // Capture Left
         if ((forwardSquare - 1 + 8) % 8 != 7 && board[forwardSquare - 1] * color < 0) {
             if (isPromotion) {
-                addMoveSlot(-4, i, forwardSquare - 1); // Knight
-                addMoveSlot(-5, i, forwardSquare - 1); // Bishop
-                addMoveSlot(-6, i, forwardSquare - 1); // Rook
                 addMoveSlot(-7, i, forwardSquare - 1); // Queen
+                addMoveSlot(-6, i, forwardSquare - 1); // Rook
+                addMoveSlot(-5, i, forwardSquare - 1); // Bishop
+                addMoveSlot(-4, i, forwardSquare - 1); // Knight
             } else {
                 addMoveSlot(i, forwardSquare - 1);
             }
@@ -826,10 +826,10 @@ public class GameState {
         // Capture Right
         if ((forwardSquare + 1) % 8 != 0 && board[forwardSquare + 1] * color < 0) {
             if (isPromotion) {
-                addMoveSlot(-4, i, forwardSquare + 1); // Knight
-                addMoveSlot(-5, i, forwardSquare + 1); // Bishop
-                addMoveSlot(-6, i, forwardSquare + 1); // Rook
                 addMoveSlot(-7, i, forwardSquare + 1); // Queen
+                addMoveSlot(-6, i, forwardSquare + 1); // Rook
+                addMoveSlot(-5, i, forwardSquare + 1); // Bishop
+                addMoveSlot(-4, i, forwardSquare + 1); // Knight
             } else {
                 addMoveSlot(i, forwardSquare + 1);
             }
@@ -837,8 +837,7 @@ public class GameState {
 
         // En Passant
         if (lastMove != null) {
-            // Left
-            if (lastMove[1] % 8 == i % 8 - 1 && lastMove[1] == i - 1) {
+            if (lastMove[1] % 8 == i % 8 - 1 && lastMove[1] == i - 1) { // Left
                 addMoveSlot(-3, i, -1);
             } else if (lastMove[1] % 8 == i % 8 + 1 && lastMove[1] == i + 1) { // Right
                 addMoveSlot(-3, i, 1);
