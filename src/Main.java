@@ -10,6 +10,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,6 +30,8 @@ public class Main extends Application {
     static final Color LIGHT_HOVER_COLOR = Color.rgb(174, 177, 135);
 
     private final Map<Integer, Image> imageCache = new HashMap<>();
+    private static final Map<String, Media> soundCache = new HashMap<>();
+    private static boolean soundsLoaded = false;
 
     public static void main(String[] args) {
         launch(args);
@@ -141,6 +145,7 @@ public class Main extends Application {
                 return;
             }
             gameStates[0] = gameState.makeMove(move);
+            playSound(move, gameState, gameStates[0]);
             gameStates[0].computeMoves();
             firstSelection[0] = true;
             selectedSquare.set(-1);
@@ -180,6 +185,7 @@ public class Main extends Application {
                 return;
             }
             gameStates[0] = gameState.makeMove(move);
+            playSound(move, gameState, gameStates[0]);
             gameStates[0].computeMoves();
             selectedSquare.set(-1);
         });
@@ -230,6 +236,45 @@ public class Main extends Application {
             }
         };
         gameLoop.start();
+    }
+
+    public static void loadSounds() {
+        String[] files = {"move-check", "move-opponent", "move-self", "capture", "castle", "promote"};
+        for (String file : files) {
+            Media media = new Media(new File("src/sounds/" + file + ".mp3").toURI().toString());
+            soundCache.put(file, media);
+        }
+        soundsLoaded = true;
+    }
+
+    public static void playSound(String sound) {
+        if (!soundsLoaded) loadSounds();
+        new MediaPlayer(soundCache.get(sound)).play();
+    }
+
+    public static void playSound(int[] move, GameState gameStateNow, GameState gameStateMoved) {
+        if (gameStateMoved.inCheck()) {
+            playSound("move-check");
+            return;
+        }
+        if (move[0] == -1) {
+            playSound("castle");
+            return;
+        }
+        if (move[0] == -2 || move[0] <= -4) {
+            playSound("promote");
+            return;
+        }
+        if (move[0] == -3) {
+            playSound("capture");
+            return;
+        }
+        int[] board = gameStateNow.getBoard();
+        if (board[move[1]] == 0) {
+            playSound(gameStateNow.isWhiteMove() ? "move-self" : "move-opponent");
+            return;
+        }
+        playSound("capture");
     }
 
     public void updatePositions(Scene scene, Rectangle[] squares, Circle[] circles,

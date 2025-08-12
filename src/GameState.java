@@ -179,7 +179,7 @@ public class GameState {
         return false;
     }
 
-    private boolean inCheck() {
+    public boolean inCheck() {
         return inCheck(getKingIdx());
     }
 
@@ -703,6 +703,10 @@ public class GameState {
 
     public int getColor() {
         return color;
+    }
+
+    public boolean isWhiteMove() {
+        return whiteMove;
     }
 
     private void addMovesForKing(int i) {
