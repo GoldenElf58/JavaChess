@@ -298,7 +298,7 @@ public class Main extends Application {
             int pieceType = gameState.getBoard()[i];
             Rectangle sq = squares[i];
 
-            circles[i].setFill(Color.TRANSPARENT);
+            circles[i].setVisible(false);
             circles[i].setRadius(pieceType == 0 ? length / 7 : length / 1.8);
             boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
             if (i == selectedSquare) {
@@ -308,9 +308,11 @@ public class Main extends Application {
                 else {
                     if (pieceType == 0) {
                         sq.setFill(getBaseColor(lightSquare));
+                        circles[i].setVisible(true);
                         circles[i].setFill(getSelectedColor(lightSquare));
                     } else {
                         sq.setFill(getHoverColor(lightSquare));
+                        circles[i].setVisible(true);
                         circles[i].setFill(getBaseColor(lightSquare));
                         circles[i].toBack();
                         sq.toBack();
@@ -319,7 +321,12 @@ public class Main extends Application {
             } else sq.setFill(getBaseColor(lightSquare));
 
             ImageView piece = pieces[i];
-            piece.setImage(pieceType == 0 ? BLANK : imageCache.computeIfAbsent(pieceType, c ->
+            if (pieceType == 0) {
+                piece.setVisible(false);
+                continue;
+            }
+            piece.setVisible(true);
+            piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
                     new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
             if (i == selectedSquare && dragging) {
                 piece.setX(mousePose[0] - length / 2);
