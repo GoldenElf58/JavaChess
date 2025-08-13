@@ -328,7 +328,6 @@ public class Main extends Application {
             @Override
             public void handle(long now) {
                 GameState gameState = gameStates[0];
-                System.out.println(root.getChildren().size());
 
                 displayBoard(scene, gameState, squares, circles, pieces, selectedSquare.get(),
                         mousePose, dragging[0]);
