@@ -119,7 +119,11 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) {
         Group root = new Group();
+        Group pencilMarkings = new Group();
         Scene scene = new Scene(root, 720, 480, Color.grayRgb(0));
+        Scene pencilScene = new Scene(pencilMarkings, 720, 480, Color.TRANSPARENT);
+        WritableImage pencilImage = new WritableImage(720, 480);
+        pencilScene.snapshot(pencilImage);
         stage.setTitle("Chess");
         stage.setMinWidth(128);
         stage.setMinHeight(128);
@@ -151,6 +155,7 @@ public class Main extends Application {
                 new Rectangle(width - (width - height) / 2, 0, (width - height) / 2, height),
         };
         root.getChildren().addAll(borders);
+        root.getChildren().add(new ImageView(pencilImage));
 
         stage.setScene(scene);
         stage.show();
@@ -172,14 +177,15 @@ public class Main extends Application {
                 if (square == -1) return;
                 specialStartSquare.set(square);
                 scene.setCursor(Cursor.HAND);
-                root.getChildren().addAll(new Group(), new Group());
+                pencilMarkings.getChildren().add(new Group());
+                pencilMarkings.getChildren().add(new Group());
                 drawRing(scene, root, square);
+                updatePencilImage(pencilImage, pencilScene, root);
                 return;
             }
             if (e.getButton() != MouseButton.PRIMARY) return;
-            ObservableList<Node> children = root.getChildren();
-            children.removeIf(child -> child instanceof Arrow || child instanceof Line ||
-                    (child instanceof Circle && ((Circle) child).getStrokeWidth() > 1));
+            pencilMarkings.getChildren().clear();
+            updatePencilImage(pencilImage, pencilScene, root);
             GameState gameState = gameStates[0];
             if (square == -1) return;
             boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
@@ -212,8 +218,9 @@ public class Main extends Application {
                 if (square == -1) return;
                 scene.setCursor(Cursor.HAND);
                 if (specialStartSquare.get() == square)
-                    drawRing(scene, root, square);
-                else drawArrow(scene, root, specialStartSquare.get(), square);
+                    drawRing(scene, pencilMarkings, square);
+                else drawArrow(scene, pencilMarkings, specialStartSquare.get(), square);
+                updatePencilImage(pencilImage, pencilScene, root);
                 return;
             }
             if (e.getButton() != MouseButton.PRIMARY) return;
@@ -225,7 +232,7 @@ public class Main extends Application {
         scene.setOnMouseClicked(e -> {
             int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
             if (e.getButton() == MouseButton.SECONDARY) {
-                ObservableList<Node> children = root.getChildren();
+                ObservableList<Node> children = pencilMarkings.getChildren();
                 if (children.getLast() instanceof Group) {
                     children.removeLast();
                     double offset = scene.getHeight() / 16;
@@ -267,6 +274,7 @@ public class Main extends Application {
                         }
                     }
                 }
+                updatePencilImage(pencilImage, pencilScene, root);
                 scene.setCursor(Cursor.DEFAULT);
                 return;
             }
@@ -357,22 +365,30 @@ public class Main extends Application {
         gameLoop.start();
     }
 
-    public static void drawArrow(Scene scene, Group root, int square1, int square2) {
+    public static void updatePencilImage(WritableImage pencilImage, Scene pencilScene, Group pencilMarkings) {
+        pencilScene.snapshot(pencilImage);
+        pencilMarkings.getChildren().removeLast();
+        ImageView iv = new ImageView(pencilImage);
+        iv.setOpacity(0.5);
+        pencilMarkings.getChildren().addLast(iv);
+    }
+
+    public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
         double squareHalfWidth = scene.getHeight() / 16;
         Arrow arrow = new Arrow(getX(scene, square1) + squareHalfWidth,
                 getY(scene, square1) + squareHalfWidth, getX(scene, square2) + squareHalfWidth,
                 getY(scene, square2) + squareHalfWidth, 10);
         arrow.setDrawTail(false);
         arrow.setStrokeWidth(10);
-        arrow.setStroke(Color.rgb(200, 75, 75, 0.5));
-        arrow.setFill(Color.rgb(200, 75, 75, 0.5));
+        arrow.setStroke(Color.rgb(200, 75, 75));
+        arrow.setFill(Color.rgb(200, 75, 75));
         arrow.setStrokeLineCap(StrokeLineCap.ROUND);
         Line line = new Line(arrow.getStartX(), arrow.getStartY(), arrow.getX3(), arrow.getY3());
         line.setStrokeWidth(10);
-        line.setStroke(Color.rgb(200, 75, 75, 0.5));
+        line.setStroke(Color.rgb(200, 75, 75));
         line.setStrokeLineCap(StrokeLineCap.ROUND);
 
-        ObservableList<Node> children = root.getChildren();
+        ObservableList<Node> children = pencilMarkings.getChildren();
         children.removeLast();
         children.removeLast();
         for (Node child : children) {
@@ -392,15 +408,15 @@ public class Main extends Application {
         children.add(line);
     }
 
-    public static void drawRing(Scene scene, Group root, int square) {
+    public static void drawRing(Scene scene, Group pencilMarkings, int square) {
         double squareHalfWidth = scene.getHeight() / 16;
         Circle circle = new Circle(getX(scene, square) + squareHalfWidth,
                 getY(scene, square) + squareHalfWidth, squareHalfWidth - 2.5);
         circle.setFill(Color.TRANSPARENT);
         circle.setStrokeWidth(5);
-        circle.setStroke(Color.rgb(200, 75, 75, 0.5));
+        circle.setStroke(Color.rgb(200, 75, 75));
 
-        ObservableList<Node> children = root.getChildren();
+        ObservableList<Node> children = pencilMarkings.getChildren();
         children.removeLast();
         children.removeLast();
         children.add(new Group());
