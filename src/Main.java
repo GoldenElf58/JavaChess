@@ -1,13 +1,17 @@
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.collections.ObservableList;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.MouseButton;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.scene.media.Media;
@@ -43,6 +47,7 @@ public class Main extends Application {
             boolean debug = askYesWithTimeout("Debug mode? (y/n) ", 3);
             runBenchmark(debug);
         }
+        System.exit(0);
     }
 
     private static boolean askYesWithTimeout(String prompt, int seconds) {
@@ -156,13 +161,28 @@ public class Main extends Application {
 
         final boolean[] shown = {false};
         AtomicInteger selectedSquare = new AtomicInteger(-1);
+        AtomicInteger specialStartSquare = new AtomicInteger(-1);
         double[] mousePose = {-1, -1};
         boolean[] dragging = {false};
         boolean[] firstSelection = {true};
 
         scene.setOnMousePressed(e -> {
-            GameState gameState = gameStates[0];
             int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+            if (e.getButton() == MouseButton.SECONDARY) {
+                selectedSquare.set(-1);
+                dragging[0] = false;
+                if (square == -1) return;
+                specialStartSquare.set(square);
+                scene.setCursor(Cursor.HAND);
+                root.getChildren().add(new Line(0, 0, 0, 0));
+                drawRing(scene, root, square);
+                return;
+            }
+            if (e.getButton() != MouseButton.PRIMARY) return;
+            ObservableList<Node> children = root.getChildren();
+            children.removeIf(child -> child instanceof Line ||
+                    (child instanceof Circle && ((Circle) child).getStrokeWidth() > 1));
+            GameState gameState = gameStates[0];
             if (square == -1) return;
             boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
             if (!canSelect) {
@@ -188,12 +208,61 @@ public class Main extends Application {
         });
 
         scene.setOnMouseDragged(e -> {
+            if (e.getButton() == MouseButton.SECONDARY) {
+                int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+                dragging[0] = false;
+                if (square == -1) return;
+                scene.setCursor(Cursor.HAND);
+                if (specialStartSquare.get() == square)
+                    drawRing(scene, root, square);
+                else drawArrow(scene, root, specialStartSquare.get(), square);
+                return;
+            }
+            if (e.getButton() != MouseButton.PRIMARY) return;
             mousePose[0] = e.getX();
             mousePose[1] = e.getY();
             dragging[0] = selectedSquare.get() != -1;
         });
 
-        scene.setOnMouseReleased(_ -> {
+        scene.setOnMouseClicked(e -> {
+            int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
+            if (e.getButton() == MouseButton.SECONDARY) {
+                ObservableList<Node> children = root.getChildren();
+                if (children.getLast() instanceof Group) {
+                    children.removeLast();
+                    double offset = scene.getHeight() / 16;
+                    if (currSquare == specialStartSquare.get()) {
+                        for (Node child : children.reversed()) {
+                            if (child instanceof Circle && ((Circle) child).getCenterX() ==
+                                    getX(scene, currSquare) + offset
+                                    && ((Circle) child).getCenterY() ==
+                                    getY(scene, currSquare) + offset) {
+                                child.setVisible(!child.isVisible());
+                                child.setManaged(!child.isManaged());
+                                System.out.println("circle");
+                                break;
+                            }
+                        }
+                    } else {
+                        for (Node child : children.reversed()) {
+                            if (child instanceof Line &&
+                                    equals((Line) child, new Line(
+                                            getX(scene, specialStartSquare.get()) + offset,
+                                            getY(scene, specialStartSquare.get()) + offset,
+                                            getX(scene, currSquare) + offset,
+                                            getY(scene, currSquare) + offset))) {
+                                child.setVisible(!child.isVisible());
+                                child.setManaged(!child.isManaged());
+                                System.out.println("line");
+                                break;
+                            }
+                        }
+                    }
+                }
+                scene.setCursor(Cursor.DEFAULT);
+                return;
+            }
+            if (e.getButton() != MouseButton.PRIMARY) return;
             if (!dragging[0]) return;
             dragging[0] = false;
             pieces[selectedSquare.get()].setX(getX(scene, selectedSquare.get()));
@@ -229,7 +298,12 @@ public class Main extends Application {
         scene.setOnMouseMoved(e -> {
             mousePose[0] = e.getX();
             mousePose[1] = e.getY();
-            if (dragging[0]) return;
+            dragging[0] = false;
+            if (selectedSquare.get() != -1) {
+                pieces[selectedSquare.get()].setX(getX(scene, selectedSquare.get()));
+                pieces[selectedSquare.get()].setY(getY(scene, selectedSquare.get()));
+                firstSelection[0] = false;
+            }
             GameState gameState = gameStates[0];
             int square = getSquare(scene, (int) e.getX(), (int) e.getY());
             if (square == -1 || !canSelectSquare(gameState, selectedSquare.get(), square)) {
@@ -254,6 +328,7 @@ public class Main extends Application {
             @Override
             public void handle(long now) {
                 GameState gameState = gameStates[0];
+                System.out.println(root.getChildren().size());
 
                 displayBoard(scene, gameState, squares, circles, pieces, selectedSquare.get(),
                         mousePose, dragging[0]);
@@ -273,6 +348,60 @@ public class Main extends Application {
             }
         };
         gameLoop.start();
+    }
+
+    public static void drawArrow(Scene scene, Group root, int square1, int square2) {
+        double squareHalfWidth = scene.getHeight() / 16;
+        Line line = new Line(getX(scene, square1) + squareHalfWidth,
+                getY(scene, square1) + squareHalfWidth, getX(scene, square2) + squareHalfWidth,
+                getY(scene, square2) + squareHalfWidth);
+        line.setStrokeWidth(10);
+        line.setStroke(Color.rgb(200, 75, 75, 0.5));
+
+        ObservableList<Node> children = root.getChildren();
+        children.removeLast();
+        for (Node child : children) {
+            if (child instanceof Line && equals((Line) child, line)) {
+                Node blank = new Group();
+                blank.setVisible(false);
+                blank.setManaged(false);
+                children.add(blank);
+                return;
+            }
+        }
+        children.add(line);
+    }
+
+    public static void drawRing(Scene scene, Group root, int square) {
+        double squareHalfWidth = scene.getHeight() / 16;
+        Circle circle = new Circle(getX(scene, square) + squareHalfWidth,
+                getY(scene, square) + squareHalfWidth, squareHalfWidth - 2.5);
+        circle.setFill(Color.TRANSPARENT);
+        circle.setStrokeWidth(5);
+        circle.setStroke(Color.rgb(200, 75, 75, 0.5));
+
+        ObservableList<Node> children = root.getChildren();
+        children.removeLast();
+        for (Node child : children.reversed()) {
+            if (child instanceof Circle && equals((Circle) child, circle)) {
+                Node blank = new Group();
+                blank.setVisible(false);
+                blank.setManaged(false);
+                children.add(blank);
+                return;
+            }
+        }
+        children.add(circle);
+    }
+
+    public static boolean equals(Circle c1, Circle c2) {
+        return c1.getCenterX() == c2.getCenterX() && c1.getCenterY() == c2.getCenterY()
+                && c1.getStrokeWidth() == c2.getStrokeWidth();
+    }
+
+    public static boolean equals(Line l1, Line l2) {
+        return l1.getStartX() == l2.getStartX() && l1.getStartY() == l2.getStartY() &&
+                l1.getEndX() == l2.getEndX() && l1.getEndY() == l2.getEndY();
     }
 
     public static void loadSounds() {
@@ -457,4 +586,5 @@ public class Main extends Application {
 
     public static Color getHoverColor(boolean light) {
         return light ? LIGHT_HOVER_COLOR : DARK_HOVER_COLOR;
-    }}
+    }
+}
