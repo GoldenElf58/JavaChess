@@ -155,7 +155,9 @@ public class Main extends Application {
                 new Rectangle(width - (width - height) / 2, 0, (width - height) / 2, height),
         };
         root.getChildren().addAll(borders);
-        root.getChildren().add(new ImageView(pencilImage));
+        ImageView iv = new ImageView(pencilImage);
+        iv.setOpacity(0.7);
+        root.getChildren().add(iv);
 
         stage.setScene(scene);
         stage.show();
@@ -179,13 +181,13 @@ public class Main extends Application {
                 scene.setCursor(Cursor.HAND);
                 pencilMarkings.getChildren().add(new Group());
                 pencilMarkings.getChildren().add(new Group());
-                drawRing(scene, root, square);
-                updatePencilImage(pencilImage, pencilScene, root);
+                drawRing(pencilScene, pencilMarkings, square);
+                pencilScene.snapshot(pencilImage);
                 return;
             }
             if (e.getButton() != MouseButton.PRIMARY) return;
             pencilMarkings.getChildren().clear();
-            updatePencilImage(pencilImage, pencilScene, root);
+            pencilScene.snapshot(pencilImage);
             GameState gameState = gameStates[0];
             if (square == -1) return;
             boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
@@ -218,9 +220,9 @@ public class Main extends Application {
                 if (square == -1) return;
                 scene.setCursor(Cursor.HAND);
                 if (specialStartSquare.get() == square)
-                    drawRing(scene, pencilMarkings, square);
-                else drawArrow(scene, pencilMarkings, specialStartSquare.get(), square);
-                updatePencilImage(pencilImage, pencilScene, root);
+                    drawRing(pencilScene, pencilMarkings, square);
+                else drawArrow(pencilScene, pencilMarkings, specialStartSquare.get(), square);
+                pencilScene.snapshot(pencilImage);
                 return;
             }
             if (e.getButton() != MouseButton.PRIMARY) return;
@@ -237,22 +239,27 @@ public class Main extends Application {
                     children.removeLast();
                     double offset = scene.getHeight() / 16;
                     if (currSquare == specialStartSquare.get()) {
+                        Circle circle = new Circle(getX(scene, currSquare) + offset,
+                                getY(scene, currSquare) + offset, offset - 2.5);
+                        circle.setFill(Color.TRANSPARENT);
+                        circle.setStrokeWidth(5);
+                        circle.setStroke(Color.rgb(200, 75, 75));
+                        circle.setOpacity(0.8);
                         for (Node child : children.reversed()) {
-                            if (child instanceof Circle && ((Circle) child).getCenterX() ==
-                                    getX(scene, currSquare) + offset
-                                    && ((Circle) child).getCenterY() ==
-                                    getY(scene, currSquare) + offset) {
+                            if (child instanceof Circle && equals((Circle) child, circle)) {
+                                children.removeLast();
                                 child.setVisible(!child.isVisible());
                                 child.setManaged(!child.isManaged());
                                 break;
                             }
                         }
                     } else {
+                        children.removeLast();
                         Arrow arrow = new Arrow(
                                 getX(scene, specialStartSquare.get()) + offset,
                                 getY(scene, specialStartSquare.get()) + offset,
                                 getX(scene, currSquare) + offset,
-                                getY(scene, currSquare) + offset, 10);
+                                getY(scene, currSquare) + offset, 30);
                         for (Node child : children.reversed()) {
                             if (child instanceof Arrow &&
                                     equals((Arrow) child, new Arrow(
@@ -274,7 +281,18 @@ public class Main extends Application {
                         }
                     }
                 }
-                updatePencilImage(pencilImage, pencilScene, root);
+                if (children.getLast() instanceof Line) {
+                    ((Line) children.getLast()).setStrokeWidth(10);
+                    children.getLast().setOpacity(1);
+                    ((Arrow) children.get(children.size() - 2)).setStrokeWidth(3);
+                    ((Arrow) children.get(children.size() - 2)).setArrowHeadSize(35);
+                    children.get(children.size() - 2).setOpacity(1);
+                } else if (children.getLast() instanceof Circle &&
+                        ((Circle) children.getLast()).getStrokeWidth() == 3) {
+                    ((Circle) children.getLast()).setStrokeWidth(5);
+                    children.getLast().setOpacity(1);
+                }
+                pencilScene.snapshot(pencilImage);
                 scene.setCursor(Cursor.DEFAULT);
                 return;
             }
@@ -365,42 +383,32 @@ public class Main extends Application {
         gameLoop.start();
     }
 
-    public static void updatePencilImage(WritableImage pencilImage, Scene pencilScene, Group pencilMarkings) {
-        pencilScene.snapshot(pencilImage);
-        pencilMarkings.getChildren().removeLast();
-        ImageView iv = new ImageView(pencilImage);
-        iv.setOpacity(0.5);
-        pencilMarkings.getChildren().addLast(iv);
-    }
 
     public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
         double squareHalfWidth = scene.getHeight() / 16;
         Arrow arrow = new Arrow(getX(scene, square1) + squareHalfWidth,
                 getY(scene, square1) + squareHalfWidth, getX(scene, square2) + squareHalfWidth,
-                getY(scene, square2) + squareHalfWidth, 10);
+                getY(scene, square2) + squareHalfWidth, 30);
         arrow.setDrawTail(false);
-        arrow.setStrokeWidth(10);
+//        arrow.setStrokeWidth(10);
         arrow.setStroke(Color.rgb(200, 75, 75));
         arrow.setFill(Color.rgb(200, 75, 75));
         arrow.setStrokeLineCap(StrokeLineCap.ROUND);
+        arrow.setOpacity(0.8);
         Line line = new Line(arrow.getStartX(), arrow.getStartY(), arrow.getX3(), arrow.getY3());
-        line.setStrokeWidth(10);
+        line.setStrokeWidth(scene.getHeight() / 80);
+        line.setStrokeWidth(7);
         line.setStroke(Color.rgb(200, 75, 75));
         line.setStrokeLineCap(StrokeLineCap.ROUND);
+        line.setOpacity(0.8);
 
         ObservableList<Node> children = pencilMarkings.getChildren();
         children.removeLast();
         children.removeLast();
         for (Node child : children) {
             if (child instanceof Arrow && equals((Arrow) child, arrow)) {
-                Node blank = new Group();
-                blank.setVisible(false);
-                blank.setManaged(false);
-                children.add(blank);
-                blank = new Group();
-                blank.setVisible(false);
-                blank.setManaged(false);
-                children.add(blank);
+                addBlank(children);
+                addBlank(children);
                 return;
             }
         }
@@ -413,23 +421,29 @@ public class Main extends Application {
         Circle circle = new Circle(getX(scene, square) + squareHalfWidth,
                 getY(scene, square) + squareHalfWidth, squareHalfWidth - 2.5);
         circle.setFill(Color.TRANSPARENT);
-        circle.setStrokeWidth(5);
+        circle.setStrokeWidth(3);
         circle.setStroke(Color.rgb(200, 75, 75));
+        circle.setOpacity(0.8);
 
         ObservableList<Node> children = pencilMarkings.getChildren();
         children.removeLast();
         children.removeLast();
-        children.add(new Group());
         for (Node child : children.reversed()) {
             if (child instanceof Circle && equals((Circle) child, circle)) {
-                Node blank = new Group();
-                blank.setVisible(false);
-                blank.setManaged(false);
-                children.add(blank);
+                addBlank(children);
+                addBlank(children);
                 return;
             }
         }
         children.add(circle);
+        addBlank(children);
+    }
+
+    public static void addBlank(ObservableList<Node> children) {
+        Group blank = new Group();
+        blank.setVisible(false);
+        blank.setManaged(false);
+        children.add(blank);
     }
 
     public static boolean equals(Arrow a1, Arrow a2) {

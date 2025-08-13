@@ -8,6 +8,7 @@ public class Arrow extends Polygon {
     private final double endX;
     private final double endY;
     private boolean drawTail = true;
+    double arrowHeadSize = defaultArrowHeadSize;
     double x1;
     double y1;
     double x2;
@@ -21,15 +22,22 @@ public class Arrow extends Polygon {
         this.startY = startY;
         this.endX = endX;
         this.endY = endY;
+        setArrowHeadSize(arrowHeadSize);
+    }
+
+    public void setArrowHeadSize(double arrowHeadSize) {
+        this.arrowHeadSize = arrowHeadSize;
         double angle = Math.atan2((endY - startY), (endX - startX)) - Math.PI / 2.0;
         double sin = Math.sin(angle);
         double cos = Math.cos(angle);
-        x1 = (-1.0 / 2.0 * cos + Math.sqrt(3) / 2 * sin) * arrowHeadSize + endX;
-        y1 = (-1.0 / 2.0 * sin - Math.sqrt(3) / 2 * cos) * arrowHeadSize + endY;
-        x2 = (1.0 / 2.0 * cos + Math.sqrt(3) / 2 * sin) * arrowHeadSize + endX;
-        y2 = (1.0 / 2.0 * sin - Math.sqrt(3) / 2 * cos) * arrowHeadSize + endY;
+        x1 = (-1.0 / 2.0 * cos + Math.sqrt(2) / 2 * sin) * arrowHeadSize + endX;
+        y1 = (-1.0 / 2.0 * sin - Math.sqrt(2) / 2 * cos) * arrowHeadSize + endY;
+        x2 = ( 1.0 / 2.0 * cos + Math.sqrt(2) / 2 * sin) * arrowHeadSize + endX;
+        y2 = ( 1.0 / 2.0 * sin - Math.sqrt(2) / 2 * cos) * arrowHeadSize + endY;
         x3 = (x1 + x2) / 2;
         y3 = (y1 + y2) / 2;
+        getPoints().clear();
+        addPoints();
     }
 
     private void addPoints() {
