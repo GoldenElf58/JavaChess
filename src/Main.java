@@ -10,9 +10,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.MouseButton;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.*;
 import javafx.stage.Stage;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
@@ -174,13 +172,13 @@ public class Main extends Application {
                 if (square == -1) return;
                 specialStartSquare.set(square);
                 scene.setCursor(Cursor.HAND);
-                root.getChildren().add(new Line(0, 0, 0, 0));
+                root.getChildren().addAll(new Group(), new Group());
                 drawRing(scene, root, square);
                 return;
             }
             if (e.getButton() != MouseButton.PRIMARY) return;
             ObservableList<Node> children = root.getChildren();
-            children.removeIf(child -> child instanceof Line ||
+            children.removeIf(child -> child instanceof Arrow || child instanceof Line ||
                     (child instanceof Circle && ((Circle) child).getStrokeWidth() > 1));
             GameState gameState = gameStates[0];
             if (square == -1) return;
@@ -239,22 +237,32 @@ public class Main extends Application {
                                     getY(scene, currSquare) + offset) {
                                 child.setVisible(!child.isVisible());
                                 child.setManaged(!child.isManaged());
-                                System.out.println("circle");
                                 break;
                             }
                         }
                     } else {
+                        Arrow arrow = new Arrow(
+                                getX(scene, specialStartSquare.get()) + offset,
+                                getY(scene, specialStartSquare.get()) + offset,
+                                getX(scene, currSquare) + offset,
+                                getY(scene, currSquare) + offset, 10);
                         for (Node child : children.reversed()) {
-                            if (child instanceof Line &&
-                                    equals((Line) child, new Line(
+                            if (child instanceof Arrow &&
+                                    equals((Arrow) child, new Arrow(
                                             getX(scene, specialStartSquare.get()) + offset,
                                             getY(scene, specialStartSquare.get()) + offset,
                                             getX(scene, currSquare) + offset,
                                             getY(scene, currSquare) + offset))) {
                                 child.setVisible(!child.isVisible());
                                 child.setManaged(!child.isManaged());
-                                System.out.println("line");
                                 break;
+                            }
+                            if (child instanceof Line &&
+                                    equals((Line) child, new Line(
+                                            arrow.getStartX(), arrow.getStartY(),
+                                            arrow.getX3(), arrow.getY3()))) {
+                                child.setVisible(!child.isVisible());
+                                child.setManaged(!child.isManaged());
                             }
                         }
                     }
@@ -351,23 +359,36 @@ public class Main extends Application {
 
     public static void drawArrow(Scene scene, Group root, int square1, int square2) {
         double squareHalfWidth = scene.getHeight() / 16;
-        Line line = new Line(getX(scene, square1) + squareHalfWidth,
+        Arrow arrow = new Arrow(getX(scene, square1) + squareHalfWidth,
                 getY(scene, square1) + squareHalfWidth, getX(scene, square2) + squareHalfWidth,
-                getY(scene, square2) + squareHalfWidth);
+                getY(scene, square2) + squareHalfWidth, 10);
+        arrow.setDrawTail(false);
+        arrow.setStrokeWidth(10);
+        arrow.setStroke(Color.rgb(200, 75, 75, 0.5));
+        arrow.setFill(Color.rgb(200, 75, 75, 0.5));
+        arrow.setStrokeLineCap(StrokeLineCap.ROUND);
+        Line line = new Line(arrow.getStartX(), arrow.getStartY(), arrow.getX3(), arrow.getY3());
         line.setStrokeWidth(10);
         line.setStroke(Color.rgb(200, 75, 75, 0.5));
+        line.setStrokeLineCap(StrokeLineCap.ROUND);
 
         ObservableList<Node> children = root.getChildren();
         children.removeLast();
+        children.removeLast();
         for (Node child : children) {
-            if (child instanceof Line && equals((Line) child, line)) {
+            if (child instanceof Arrow && equals((Arrow) child, arrow)) {
                 Node blank = new Group();
+                blank.setVisible(false);
+                blank.setManaged(false);
+                children.add(blank);
+                blank = new Group();
                 blank.setVisible(false);
                 blank.setManaged(false);
                 children.add(blank);
                 return;
             }
         }
+        children.add(arrow);
         children.add(line);
     }
 
@@ -381,6 +402,8 @@ public class Main extends Application {
 
         ObservableList<Node> children = root.getChildren();
         children.removeLast();
+        children.removeLast();
+        children.add(new Group());
         for (Node child : children.reversed()) {
             if (child instanceof Circle && equals((Circle) child, circle)) {
                 Node blank = new Group();
@@ -391,6 +414,11 @@ public class Main extends Application {
             }
         }
         children.add(circle);
+    }
+
+    public static boolean equals(Arrow a1, Arrow a2) {
+        return a1.getStartX() == a2.getStartX() && a1.getStartY() == a2.getStartY() &&
+                a1.getEndX() == a2.getEndX() && a1.getEndY() == a2.getEndY();
     }
 
     public static boolean equals(Circle c1, Circle c2) {
