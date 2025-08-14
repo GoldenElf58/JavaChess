@@ -7,8 +7,8 @@ public class Colors {
     public static final Color DARK_SELECTED_COLOR = Color.rgb(100, 110, 64);
 
     public static final Color LIGHT_SELECTED_COLOR = Color.rgb(130, 151, 105);
-    public static final Color LIGHT_HOVER_COLOR = Color.rgb(132, 121, 78);
-    public static final Color DARK_HOVER_COLOR = Color.rgb(59, 92, 23);
+    public static final Color LIGHT_HOVER_COLOR = Color.rgb(174, 177, 135);
+    public static final Color DARK_HOVER_COLOR = Color.rgb(132, 121, 78);
 
     public static final Color PENCIL_COLOR = Color.rgb(21, 120, 27);
 
