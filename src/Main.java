@@ -16,12 +16,9 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 
 import java.io.File;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.HashMap;
-import java.util.Map;
 
 import static java.lang.Math.floorDiv;
 
@@ -32,11 +29,28 @@ public class Main extends Application {
     static final Color DARK_SELECTED_COLOR = Color.rgb(100, 110, 64);
     static final Color LIGHT_SELECTED_COLOR = Color.rgb(130, 151, 105);
     static final Color DARK_HOVER_COLOR = Color.rgb(132, 121, 78);
-    static final Color LIGHT_HOVER_COLOR = Color.rgb(174, 177, 135);
+    static final Color LIGHT_HOVER_COLOR = Color.rgb(59, 92, 23);
+
+    static final Color PENCIL_COLOR = Color.rgb(21, 120, 27);
+
+    static final double ARROW_HEAD_LINE_RATIO = 0.2;
+
+    static final double ARROW_HEAD_SMALL_RATIO = 0.5;
+    static final double ARROW_STROKE_SMALL_RATIO = 0.04;
+    static final double LINE_WIDTH_SMALL_RATIO = 0.135;
+    static final double CIRCLE_RING_SMALL_RATIO = 0.05;
+    static final double EDIT_OPACITY = 0.9;
+
+    static final double ARROW_HEAD_RATIO = 0.55;
+    static final double ARROW_STROKE_RATIO = 0.05;
+    static final double LINE_WIDTH_RATIO = 0.15;
+    static final double CIRCLE_RING_RATIO = 0.0833333333;
 
     private final Map<Integer, Image> imageCache = new HashMap<>();
     private static final Map<String, Media> soundCache = new HashMap<>();
     private static boolean soundsLoaded = false;
+    private static double previousWidth;
+    private static double previousHeight;
 
     public static void main(String[] args) {
         launch(args);
@@ -122,11 +136,13 @@ public class Main extends Application {
         Group pencilMarkings = new Group();
         Scene scene = new Scene(root, 720, 480, Color.grayRgb(0));
         Scene pencilScene = new Scene(pencilMarkings, 720, 480, Color.TRANSPARENT);
-        WritableImage pencilImage = new WritableImage(720, 480);
+        previousWidth = 720;
+        previousHeight = 480;
+        WritableImage pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
         stage.setTitle("Chess");
-        stage.setMinWidth(128);
-        stage.setMinHeight(128);
+        stage.setMinWidth(292);
+        stage.setMinHeight(292);
         final GameState[] gameStates = {new GameState()};
 
         Rectangle[] squares = new Rectangle[64];
@@ -156,7 +172,7 @@ public class Main extends Application {
         };
         root.getChildren().addAll(borders);
         ImageView iv = new ImageView(pencilImage);
-        iv.setOpacity(0.7);
+        iv.setOpacity(0.6);
         root.getChildren().add(iv);
 
         stage.setScene(scene);
@@ -181,7 +197,7 @@ public class Main extends Application {
                 scene.setCursor(Cursor.HAND);
                 pencilMarkings.getChildren().add(new Group());
                 pencilMarkings.getChildren().add(new Group());
-                drawRing(pencilScene, pencilMarkings, square);
+                drawRing(scene, pencilMarkings, square);
                 pencilScene.snapshot(pencilImage);
                 return;
             }
@@ -220,8 +236,8 @@ public class Main extends Application {
                 if (square == -1) return;
                 scene.setCursor(Cursor.HAND);
                 if (specialStartSquare.get() == square)
-                    drawRing(pencilScene, pencilMarkings, square);
-                else drawArrow(pencilScene, pencilMarkings, specialStartSquare.get(), square);
+                    drawRing(scene, pencilMarkings, square);
+                else drawArrow(scene, pencilMarkings, specialStartSquare.get(), square);
                 pencilScene.snapshot(pencilImage);
                 return;
             }
@@ -233,6 +249,7 @@ public class Main extends Application {
 
         scene.setOnMouseClicked(e -> {
             int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
+            double squareWidth = scene.getHeight() / 8;
             if (e.getButton() == MouseButton.SECONDARY) {
                 ObservableList<Node> children = pencilMarkings.getChildren();
                 if (children.getLast() instanceof Group) {
@@ -240,11 +257,10 @@ public class Main extends Application {
                     double offset = scene.getHeight() / 16;
                     if (currSquare == specialStartSquare.get()) {
                         Circle circle = new Circle(getX(scene, currSquare) + offset,
-                                getY(scene, currSquare) + offset, offset - 2.5);
+                                getY(scene, currSquare) + offset,
+                                offset - squareWidth * CIRCLE_RING_RATIO / 2);
                         circle.setFill(Color.TRANSPARENT);
-                        circle.setStrokeWidth(5);
-                        circle.setStroke(Color.rgb(200, 75, 75));
-                        circle.setOpacity(0.8);
+                        circle.setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
                         for (Node child : children.reversed()) {
                             if (child instanceof Circle && equals((Circle) child, circle)) {
                                 children.removeLast();
@@ -259,37 +275,44 @@ public class Main extends Application {
                                 getX(scene, specialStartSquare.get()) + offset,
                                 getY(scene, specialStartSquare.get()) + offset,
                                 getX(scene, currSquare) + offset,
-                                getY(scene, currSquare) + offset, 30);
-                        for (Node child : children.reversed()) {
+                                getY(scene, currSquare) + offset,
+                                squareWidth * ARROW_HEAD_LINE_RATIO);
+                        Iterator<Node> it = children.iterator();
+                        while (it.hasNext()) {
+                            Node child = it.next();
                             if (child instanceof Arrow &&
                                     equals((Arrow) child, new Arrow(
                                             getX(scene, specialStartSquare.get()) + offset,
                                             getY(scene, specialStartSquare.get()) + offset,
                                             getX(scene, currSquare) + offset,
                                             getY(scene, currSquare) + offset))) {
-                                child.setVisible(!child.isVisible());
-                                child.setManaged(!child.isManaged());
-                                break;
+                                it.remove();
                             }
                             if (child instanceof Line &&
                                     equals((Line) child, new Line(
                                             arrow.getStartX(), arrow.getStartY(),
                                             arrow.getX3(), arrow.getY3()))) {
-                                child.setVisible(!child.isVisible());
-                                child.setManaged(!child.isManaged());
+                                it.remove();
                             }
                         }
                     }
                 }
+                if (children.isEmpty()) {
+                    pencilScene.snapshot(pencilImage);
+                    scene.setCursor(Cursor.DEFAULT);
+                    return;
+                }
                 if (children.getLast() instanceof Line) {
-                    ((Line) children.getLast()).setStrokeWidth(10);
+                    ((Line) children.getLast()).setStrokeWidth(squareWidth * LINE_WIDTH_RATIO);
                     children.getLast().setOpacity(1);
-                    ((Arrow) children.get(children.size() - 2)).setStrokeWidth(3);
-                    ((Arrow) children.get(children.size() - 2)).setArrowHeadSize(35);
+                    ((Arrow) children.get(children.size() - 2))
+                            .setStrokeWidth(squareWidth * ARROW_STROKE_RATIO);
+                    ((Arrow) children.get(children.size() - 2))
+                            .setArrowHeadSize(squareWidth * ARROW_HEAD_RATIO);
                     children.get(children.size() - 2).setOpacity(1);
                 } else if (children.getLast() instanceof Circle &&
-                        ((Circle) children.getLast()).getStrokeWidth() == 3) {
-                    ((Circle) children.getLast()).setStrokeWidth(5);
+                        ((Circle) children.getLast()).getStrokeWidth() == squareWidth * CIRCLE_RING_SMALL_RATIO) {
+                    ((Circle) children.getLast()).setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
                     children.getLast().setOpacity(1);
                 }
                 pencilScene.snapshot(pencilImage);
@@ -352,11 +375,15 @@ public class Main extends Application {
                     Cursor.OPEN_HAND : Cursor.HAND);
         });
 
-        scene.widthProperty().addListener(_ -> updatePositions(scene, squares, circles, pieces,
-                borders));
-        scene.heightProperty().addListener(_ -> updatePositions(scene, squares, circles, pieces,
-                borders));
-        updatePositions(scene, squares, circles, pieces, borders);
+        scene.widthProperty().addListener(_ -> {
+            updatePositions(scene, squares, circles, pieces, borders, pencilMarkings.getChildren());
+            pencilScene.snapshot(pencilImage);
+        });
+        scene.heightProperty().addListener(_ -> {
+            updatePositions(scene, squares, circles, pieces, borders, pencilMarkings.getChildren());
+            pencilScene.snapshot(pencilImage);
+        });
+        updatePositions(scene, squares, circles, pieces, borders, pencilMarkings.getChildren());
 
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
@@ -385,22 +412,25 @@ public class Main extends Application {
 
 
     public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
-        double squareHalfWidth = scene.getHeight() / 16;
-        Arrow arrow = new Arrow(getX(scene, square1) + squareHalfWidth,
-                getY(scene, square1) + squareHalfWidth, getX(scene, square2) + squareHalfWidth,
-                getY(scene, square2) + squareHalfWidth, 30);
+        double squareWidth = scene.getHeight() / 8;
+        Arrow arrow = new Arrow(getX(scene, square1) + squareWidth / 2,
+                getY(scene, square1) + squareWidth / 2, getX(scene, square2) + squareWidth / 2,
+                getY(scene, square2) + squareWidth / 2, squareWidth * ARROW_HEAD_LINE_RATIO);
         arrow.setDrawTail(false);
-//        arrow.setStrokeWidth(10);
-        arrow.setStroke(Color.rgb(200, 75, 75));
-        arrow.setFill(Color.rgb(200, 75, 75));
+        arrow.setStrokeWidth(squareWidth * ARROW_STROKE_SMALL_RATIO);
+        arrow.setStroke(PENCIL_COLOR);
+        arrow.setFill(PENCIL_COLOR);
         arrow.setStrokeLineCap(StrokeLineCap.ROUND);
-        arrow.setOpacity(0.8);
+        arrow.setOpacity(EDIT_OPACITY);
+
         Line line = new Line(arrow.getStartX(), arrow.getStartY(), arrow.getX3(), arrow.getY3());
-        line.setStrokeWidth(scene.getHeight() / 80);
-        line.setStrokeWidth(7);
-        line.setStroke(Color.rgb(200, 75, 75));
+        line.setStrokeWidth(squareWidth * LINE_WIDTH_SMALL_RATIO);
+        line.setStroke(PENCIL_COLOR);
         line.setStrokeLineCap(StrokeLineCap.ROUND);
-        line.setOpacity(0.8);
+        line.setOpacity(EDIT_OPACITY);
+        line.setOpacity(EDIT_OPACITY);
+
+        arrow.setArrowHeadSize(squareWidth * ARROW_HEAD_SMALL_RATIO);
 
         ObservableList<Node> children = pencilMarkings.getChildren();
         children.removeLast();
@@ -417,13 +447,14 @@ public class Main extends Application {
     }
 
     public static void drawRing(Scene scene, Group pencilMarkings, int square) {
-        double squareHalfWidth = scene.getHeight() / 16;
-        Circle circle = new Circle(getX(scene, square) + squareHalfWidth,
-                getY(scene, square) + squareHalfWidth, squareHalfWidth - 2.5);
+        double squareWidth = scene.getHeight() / 8;
+        Circle circle = new Circle(getX(scene, square) + squareWidth / 2,
+                getY(scene, square) + squareWidth / 2,
+                squareWidth / 2 - squareWidth * CIRCLE_RING_RATIO / 2);
         circle.setFill(Color.TRANSPARENT);
-        circle.setStrokeWidth(3);
-        circle.setStroke(Color.rgb(200, 75, 75));
-        circle.setOpacity(0.8);
+        circle.setStrokeWidth(squareWidth * CIRCLE_RING_SMALL_RATIO);
+        circle.setStroke(PENCIL_COLOR);
+        circle.setOpacity(EDIT_OPACITY);
 
         ObservableList<Node> children = pencilMarkings.getChildren();
         children.removeLast();
@@ -502,10 +533,20 @@ public class Main extends Application {
     }
 
     public void updatePositions(Scene scene, Rectangle[] squares, Circle[] circles,
-                                ImageView[] pieces, Rectangle[] borders) {
+                                ImageView[] pieces, Rectangle[] borders,
+                                ObservableList<Node> pencilChildren) {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
+        if (width < 292 - 28) {
+            System.out.println(width + " " + height);
+            width = 292 - 28;
+        }
+        if (height < 292 - 28) {
+            System.out.println(width + " " + height);
+            height = 292 - 28;
+            length = height / 8;
+        }
         borders[0].setHeight(scene.getHeight());
         borders[0].setWidth((width - height) / 2);
         borders[1].setHeight(scene.getHeight());
@@ -526,6 +567,42 @@ public class Main extends Application {
             pieces[i].setFitHeight(length);
             pieces[i].setFitWidth(length);
         }
+        for (Node child : pencilChildren) {
+            if (child instanceof Circle) {
+                int square = getSquare(previousWidth, previousHeight,
+                        (int) ((Circle) child).getCenterX(), (int) ((Circle) child).getCenterY());
+                ((Circle) child).setCenterX(getX(width, height, square) + length / 2);
+                ((Circle) child).setCenterY(getY(height, square) + length / 2);
+                ((Circle) child).setStrokeWidth(length * CIRCLE_RING_RATIO);
+                ((Circle) child).setRadius(length / 2 - ((Circle) child).getStrokeWidth() / 2);
+            } else if (child instanceof Line) {
+                int startSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Line) child).getStartX(), (int) ((Line) child).getStartY());
+                int endSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Line) child).getEndX(), (int) ((Line) child).getEndY());
+                Arrow arrow = new Arrow(getX(scene, startSquare) + length / 2,
+                        getY(scene, startSquare) + length / 2, getX(scene, endSquare) + length / 2,
+                        getY(scene, endSquare) + length / 2, length * ARROW_HEAD_LINE_RATIO);
+                ((Line) child).setStartX(arrow.getStartX());
+                ((Line) child).setStartY(arrow.getStartY());
+                ((Line) child).setEndX(arrow.getX3());
+                ((Line) child).setEndY(arrow.getY3());
+                ((Line) child).setStrokeWidth(length * LINE_WIDTH_RATIO);
+            } else if (child instanceof Arrow) {
+                int startSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Arrow) child).getStartX(), (int) ((Arrow) child).getStartY());
+                int endSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Arrow) child).getEndX(), (int) ((Arrow) child).getEndY());
+                ((Arrow) child).setStartX(getX(width, height, startSquare) + length / 2);
+                ((Arrow) child).setStartY(getY(height, startSquare) + length / 2);
+                ((Arrow) child).setEndX(getX(width, height, endSquare) + length / 2);
+                ((Arrow) child).setEndY(getY(height, endSquare) + length / 2);
+                ((Arrow) child).setStrokeWidth(length * ARROW_STROKE_RATIO);
+                ((Arrow) child).setArrowHeadSize(length * ARROW_HEAD_RATIO);
+            }
+        }
+        previousWidth = width;
+        previousHeight = height;
     }
 
     public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
@@ -576,10 +653,13 @@ public class Main extends Application {
     }
 
     public static int getSquare(Scene scene, int x, int y) {
-        int length = (int) scene.getHeight() / 8;
-        int width = (int) scene.getWidth();
+        return getSquare(scene.getWidth(), scene.getHeight(), x, y);
+    }
+
+    public static int getSquare(double width, double height, int x, int y) {
+        int length = (int) height / 8;
         int row = floorDiv(y, length);
-        int col = floorDiv(x - (int) (width - scene.getHeight()) / 2, length);
+        int col = floorDiv(x - (int) (width - height) / 2, length);
         if (row < 0 || row > 7 || col < 0 || col > 7) return -1;
         return row * 8 + col;
     }
