@@ -127,4 +127,9 @@ public class Arrow extends Polygon {
     public void setFill(Color color) {
         super.setFill(color);
     }
+
+    public boolean equals(Arrow other) {
+        return this.getStartX() == other.getStartX() && this.getStartY() == other.getStartY() &&
+                this.getEndX() == other.getEndX() && this.getEndY() == other.getEndY();
+    }
 }

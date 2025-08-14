@@ -12,8 +12,6 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
 import javafx.stage.Stage;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 
 import java.io.File;
 import java.util.*;
@@ -23,15 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.lang.Math.floorDiv;
 
 public class Main extends Application {
-
-    static final Color DARK_COLOR = Color.rgb(181, 136, 99);
-    static final Color LIGHT_COLOR = Color.rgb(240, 217, 181);
-    static final Color DARK_SELECTED_COLOR = Color.rgb(100, 110, 64);
-    static final Color LIGHT_SELECTED_COLOR = Color.rgb(130, 151, 105);
-    static final Color DARK_HOVER_COLOR = Color.rgb(132, 121, 78);
-    static final Color LIGHT_HOVER_COLOR = Color.rgb(59, 92, 23);
-
-    static final Color PENCIL_COLOR = Color.rgb(21, 120, 27);
 
     static final double ARROW_HEAD_LINE_RATIO = 0.2;
 
@@ -47,8 +36,6 @@ public class Main extends Application {
     static final double CIRCLE_RING_RATIO = 0.0833333333;
 
     private final Map<Integer, Image> imageCache = new HashMap<>();
-    private static final Map<String, Media> soundCache = new HashMap<>();
-    private static boolean soundsLoaded = false;
     private static double previousWidth;
     private static double previousHeight;
 
@@ -136,13 +123,16 @@ public class Main extends Application {
         Group pencilMarkings = new Group();
         Scene scene = new Scene(root, 720, 480, Color.grayRgb(0));
         Scene pencilScene = new Scene(pencilMarkings, 720, 480, Color.TRANSPARENT);
+        SoundHandler.loadSounds();
         previousWidth = 720;
         previousHeight = 480;
-        WritableImage pencilImage = new WritableImage(3840, 2160);
-        pencilScene.snapshot(pencilImage);
+
         stage.setTitle("Chess");
         stage.setMinWidth(292);
         stage.setMinHeight(292);
+
+        WritableImage pencilImage = new WritableImage(3840, 2160);
+        pencilScene.snapshot(pencilImage);
         final GameState[] gameStates = {new GameState()};
 
         Rectangle[] squares = new Rectangle[64];
@@ -154,7 +144,7 @@ public class Main extends Application {
         for (int i = 0; i < 64; i++) {
             double x = getX(width, height, i);
             squares[i] = new Rectangle(x, floorDiv(i, 8) * length, length, length);
-            squares[i].setFill(((i / 8) + (i % 8)) % 2 == 1 ? DARK_COLOR : LIGHT_COLOR);
+            squares[i].setFill(Colors.getSquareBaseColor(((i / 8) + (i % 8)) % 2 == 0));
             pieces[i] = new ImageView(new WritableImage(1, 1));
             pieces[i].setX(x);
             pieces[i].setY(floorDiv(i, 8) * length);
@@ -212,7 +202,7 @@ public class Main extends Application {
                 selectedSquare.set(-1);
                 return;
             }
-            int[] move = findMove(gameState, selectedSquare.get(), square);
+            int[] move = gameState.findMove(selectedSquare.get(), square);
             if (move == null) {
                 dragging[0] = true;
                 mousePose[0] = e.getX();
@@ -223,7 +213,7 @@ public class Main extends Application {
                 return;
             }
             gameStates[0] = gameState.makeMove(move);
-            playSound(move, gameState, gameStates[0]);
+            SoundHandler.playSound(move, gameState, gameStates[0]);
             gameStates[0].computeMoves();
             firstSelection[0] = true;
             selectedSquare.set(-1);
@@ -281,7 +271,7 @@ public class Main extends Application {
                         while (it.hasNext()) {
                             Node child = it.next();
                             if (child instanceof Arrow &&
-                                    equals((Arrow) child, new Arrow(
+                                    ((Arrow) child).equals(new Arrow(
                                             getX(scene, specialStartSquare.get()) + offset,
                                             getY(scene, specialStartSquare.get()) + offset,
                                             getX(scene, currSquare) + offset,
@@ -334,7 +324,7 @@ public class Main extends Application {
                 firstSelection[0] = true;
                 return;
             }
-            int[] move = findMove(gameState, selectedSquare.get(), square);
+            int[] move = gameState.findMove(selectedSquare.get(), square);
             if (move == null) {
                 if (selectedSquare.get() == square) {
                     scene.setCursor(Cursor.OPEN_HAND);
@@ -347,7 +337,7 @@ public class Main extends Application {
                 return;
             }
             gameStates[0] = gameState.makeMove(move);
-            playSound(move, gameState, gameStates[0]);
+            SoundHandler.playSound(move, gameState, gameStates[0]);
             gameStates[0].computeMoves();
             selectedSquare.set(-1);
         });
@@ -371,7 +361,7 @@ public class Main extends Application {
                 scene.setCursor(Cursor.OPEN_HAND);
                 return;
             }
-            scene.setCursor(findMove(gameState, selectedSquare.get(), square) == null ?
+            scene.setCursor(gameState.findMove(selectedSquare.get(), square) == null ?
                     Cursor.OPEN_HAND : Cursor.HAND);
         });
 
@@ -394,7 +384,7 @@ public class Main extends Application {
                         mousePose, dragging[0]);
 
                 if (!gameState.isInProgress() && !shown[0]) {
-                    playSound("game-end");
+                    SoundHandler.playSound("game-end");
                     System.out.println(gameState);
                     System.out.println((switch (gameState.getWinner()) {
                         case 0 -> "Draw";
@@ -410,7 +400,6 @@ public class Main extends Application {
         gameLoop.start();
     }
 
-
     public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
         double squareWidth = scene.getHeight() / 8;
         Arrow arrow = new Arrow(getX(scene, square1) + squareWidth / 2,
@@ -418,14 +407,14 @@ public class Main extends Application {
                 getY(scene, square2) + squareWidth / 2, squareWidth * ARROW_HEAD_LINE_RATIO);
         arrow.setDrawTail(false);
         arrow.setStrokeWidth(squareWidth * ARROW_STROKE_SMALL_RATIO);
-        arrow.setStroke(PENCIL_COLOR);
-        arrow.setFill(PENCIL_COLOR);
+        arrow.setStroke(Colors.PENCIL_COLOR);
+        arrow.setFill(Colors.PENCIL_COLOR);
         arrow.setStrokeLineCap(StrokeLineCap.ROUND);
         arrow.setOpacity(EDIT_OPACITY);
 
         Line line = new Line(arrow.getStartX(), arrow.getStartY(), arrow.getX3(), arrow.getY3());
         line.setStrokeWidth(squareWidth * LINE_WIDTH_SMALL_RATIO);
-        line.setStroke(PENCIL_COLOR);
+        line.setStroke(Colors.PENCIL_COLOR);
         line.setStrokeLineCap(StrokeLineCap.ROUND);
         line.setOpacity(EDIT_OPACITY);
         line.setOpacity(EDIT_OPACITY);
@@ -436,7 +425,7 @@ public class Main extends Application {
         children.removeLast();
         children.removeLast();
         for (Node child : children) {
-            if (child instanceof Arrow && equals((Arrow) child, arrow)) {
+            if (child instanceof Arrow && arrow.equals((Arrow) child)) {
                 addBlank(children);
                 addBlank(children);
                 return;
@@ -453,7 +442,7 @@ public class Main extends Application {
                 squareWidth / 2 - squareWidth * CIRCLE_RING_RATIO / 2);
         circle.setFill(Color.TRANSPARENT);
         circle.setStrokeWidth(squareWidth * CIRCLE_RING_SMALL_RATIO);
-        circle.setStroke(PENCIL_COLOR);
+        circle.setStroke(Colors.PENCIL_COLOR);
         circle.setOpacity(EDIT_OPACITY);
 
         ObservableList<Node> children = pencilMarkings.getChildren();
@@ -477,11 +466,6 @@ public class Main extends Application {
         children.add(blank);
     }
 
-    public static boolean equals(Arrow a1, Arrow a2) {
-        return a1.getStartX() == a2.getStartX() && a1.getStartY() == a2.getStartY() &&
-                a1.getEndX() == a2.getEndX() && a1.getEndY() == a2.getEndY();
-    }
-
     public static boolean equals(Circle c1, Circle c2) {
         return c1.getCenterX() == c2.getCenterX() && c1.getCenterY() == c2.getCenterY()
                 && c1.getStrokeWidth() == c2.getStrokeWidth();
@@ -490,46 +474,6 @@ public class Main extends Application {
     public static boolean equals(Line l1, Line l2) {
         return l1.getStartX() == l2.getStartX() && l1.getStartY() == l2.getStartY() &&
                 l1.getEndX() == l2.getEndX() && l1.getEndY() == l2.getEndY();
-    }
-
-    public static void loadSounds() {
-        String[] files = {"move-check", "move-opponent", "move-self", "capture", "castle",
-                "promote", "game-end"};
-        for (String file : files) {
-            Media media = new Media(new File("src/sounds/" + file + ".mp3").toURI().toString());
-            soundCache.put(file, media);
-        }
-        soundsLoaded = true;
-    }
-
-    public static void playSound(String sound) {
-        if (!soundsLoaded) loadSounds();
-        new MediaPlayer(soundCache.get(sound)).play();
-    }
-
-    public static void playSound(int[] move, GameState gameStateNow, GameState gameStateMoved) {
-        if (gameStateMoved.inCheck()) {
-            playSound("move-check");
-            return;
-        }
-        if (move[0] == -1) {
-            playSound("castle");
-            return;
-        }
-        if (move[0] == -2 || move[0] <= -4) {
-            playSound("promote");
-            return;
-        }
-        if (move[0] == -3) {
-            playSound("capture");
-            return;
-        }
-        int[] board = gameStateNow.getBoard();
-        if (board[move[1]] == 0) {
-            playSound(gameStateNow.isWhiteMove() ? "move-self" : "move-opponent");
-            return;
-        }
-        playSound("capture");
     }
 
     public void updatePositions(Scene scene, Rectangle[] squares, Circle[] circles,
@@ -618,23 +562,23 @@ public class Main extends Application {
             circles[i].setRadius(pieceType == 0 ? length / 7 : length / 1.8);
             boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
             if (i == selectedSquare) {
-                sq.setFill(getSelectedColor(lightSquare));
-            } else if (findMove(gameState, selectedSquare, i) != null) {
-                if (mouseSquare == i) sq.setFill(getHoverColor(lightSquare));
+                sq.setFill(Colors.getSquareSelectedColor(lightSquare));
+            } else if (gameState.findMove(selectedSquare, i) != null) {
+                if (mouseSquare == i) sq.setFill(Colors.getSquareHoverColor(lightSquare));
                 else {
                     if (pieceType == 0) {
-                        sq.setFill(getBaseColor(lightSquare));
+                        sq.setFill(Colors.getSquareBaseColor(lightSquare));
                         circles[i].setVisible(true);
-                        circles[i].setFill(getSelectedColor(lightSquare));
+                        circles[i].setFill(Colors.getSquareSelectedColor(lightSquare));
                     } else {
-                        sq.setFill(getHoverColor(lightSquare));
+                        sq.setFill(Colors.getSquareHoverColor(lightSquare));
                         circles[i].setVisible(true);
-                        circles[i].setFill(getBaseColor(lightSquare));
+                        circles[i].setFill(Colors.getSquareBaseColor(lightSquare));
                         circles[i].toBack();
                         sq.toBack();
                     }
                 }
-            } else sq.setFill(getBaseColor(lightSquare));
+            } else sq.setFill(Colors.getSquareBaseColor(lightSquare));
 
             ImageView piece = pieces[i];
             if (pieceType == 0) {
@@ -668,33 +612,7 @@ public class Main extends Application {
         boolean isColor = gameState.getBoard()[to] * gameState.getColor() > 0;
         if (isColor) return true;
         if (to == from || !gameState.isInProgress()) return false;
-        return findMove(gameState, from, to) != null;
-    }
-
-    private static int[] findMove(GameState gameState, int from, int to) {
-        if (to == from || from == -1) return null;
-        for (int i = 0; i < gameState.getMoveCount(); i++) {
-            int[] move = gameState.getMove(i);
-            if (move[0] >= 0) {
-                if (move[0] == from && move[1] == to) {
-                    return move;
-                }
-            } else {
-                if (move[0] == -1) {
-                    if (move[1] == from && (to == from + move[2] * 2 ||
-                            (move[2] == 1 ? to == from + 3 : to == from - 4)))
-                        return move;
-                } else if (move[0] == -2) {
-                    if (move[1] == from && from - 8 * gameState.getColor() == to) return move;
-                } else if (move[0] == -3) {
-                    if (move[1] == from && to == from - 8 * gameState.getColor() + move[2])
-                        return move;
-                } else {
-                    if (move[1] == from && move[2] == to) return move;
-                }
-            }
-        }
-        return null;
+        return gameState.findMove(from, to) != null;
     }
 
     public static double getX(Scene scene, int idx) {
@@ -711,17 +629,5 @@ public class Main extends Application {
 
     public static double getY(double height, int idx) {
         return floorDiv(idx, 8) * height / 8;
-    }
-
-    public static Color getBaseColor(boolean light) {
-        return light ? LIGHT_COLOR : DARK_COLOR;
-    }
-
-    public static Color getSelectedColor(boolean light) {
-        return light ? LIGHT_SELECTED_COLOR : DARK_SELECTED_COLOR;
-    }
-
-    public static Color getHoverColor(boolean light) {
-        return light ? LIGHT_HOVER_COLOR : DARK_HOVER_COLOR;
     }
 }

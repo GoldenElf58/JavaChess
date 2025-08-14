@@ -843,6 +843,27 @@ public class GameState {
         }
     }
 
+    public int[] findMove(int from, int to) {
+        if (to == from || from == -1) return null;
+        for (int i = 0; i < moveCount; i++) {
+            int[] move = this.getMove(i);
+            if (move[0] >= 0) {
+                if (move[0] == from && move[1] == to) return move;
+            } else {
+                if (move[0] == -1) {
+                    if (move[1] == from && (to == from + move[2] * 2 ||
+                            (move[2] == 1 ? to == from + 3 : to == from - 4)))
+                        return move;
+                } else if (move[0] == -2) {
+                    if (move[1] == from && from - 8 * color == to) return move;
+                } else if (move[0] == -3) {
+                    if (move[1] == from && to == from - 8 * color + move[2]) return move;
+                } else if (move[1] == from && move[2] == to) return move;
+            }
+        }
+        return null;
+    }
+
     public String moveToString(int moveIdx) {
         return moveToString(getMove(moveIdx));
     }
