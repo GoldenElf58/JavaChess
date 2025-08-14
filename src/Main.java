@@ -39,7 +39,7 @@ public class Main extends Application {
     static final double ARROW_STROKE_SMALL_RATIO = 0.04;
     static final double LINE_WIDTH_SMALL_RATIO = 0.135;
     static final double CIRCLE_RING_SMALL_RATIO = 0.05;
-    static final double EDIT_OPACITY = 0.9;
+    static final double EDIT_OPACITY = 1;
 
     static final double ARROW_HEAD_RATIO = 0.55;
     static final double ARROW_STROKE_RATIO = 0.05;
