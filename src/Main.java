@@ -8,6 +8,7 @@ import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
@@ -48,6 +49,10 @@ public class Main extends Application {
     private Group pencilMarkings;
     private Scene pencilScene;
     private GameState gameState;
+    private List<GameState> gameStateHistory;
+    private List<GameState> gameStateFuture;
+    private List<int[]> moveHistory;
+    private List<int[]> moveFuture;
     private WritableImage pencilImage;
 
     private Rectangle[] squares;
@@ -55,12 +60,14 @@ public class Main extends Application {
     private ImageView[] pieces;
     private final Rectangle[] borders = new Rectangle[2];
 
+    private final double[] mousePose = {-1, -1};
     private int specialStartSquare = -1;
     private int selectedSquare = -1;
     private boolean dragging = true;
-    private final double[] mousePose = {-1, -1};
     private boolean firstSelection = false;
     private boolean shown = false;
+    private boolean command = false;
+    private boolean shift = false;
 
     public static void main(String[] args) {
         launch(args);
@@ -156,6 +163,10 @@ public class Main extends Application {
         pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
         gameState = new GameState();
+        gameStateHistory = new Stack<>();
+        gameStateFuture = new Stack<>();
+        moveHistory = new Stack<>();
+        moveFuture = new Stack<>();
 
         initializeNodes(root);
 
@@ -168,6 +179,8 @@ public class Main extends Application {
         scene.setOnMouseDragged(this::onMouseDragged);
         scene.setOnMouseClicked(this::onMouseClicked);
         scene.setOnMouseMoved(this::onMouseMoved);
+        scene.setOnKeyPressed(this::onKeyPressed);
+        scene.setOnKeyReleased(this::onKeyReleased);
 
         scene.widthProperty().addListener(_ -> updatePositions());
         scene.heightProperty().addListener(_ -> updatePositions());
@@ -197,6 +210,50 @@ public class Main extends Application {
             }));
             shown = true;
         }
+    }
+
+    private void onKeyReleased(KeyEvent e) {
+        switch (e.getCode()) {
+            case COMMAND -> command = false;
+            case SHIFT -> shift = false;
+        }
+    }
+
+    private void onKeyPressed(KeyEvent e) {
+        switch (e.getCode()) {
+            case Q -> System.exit(0);
+            case LEFT, A, J -> undo();
+            case RIGHT, D, L -> redo();
+            case Z -> {
+                if (command) {
+                    if (shift) redo();
+                    else undo();
+                }
+            }
+            case Y -> {
+                if (command) redo();
+            }
+            case COMMAND -> command = true;
+            case SHIFT -> shift = true;
+        }
+    }
+
+    private void undo() {
+        if (gameStateHistory.isEmpty()) return;
+        SoundHandler.playSound(moveHistory.getLast(), gameStateHistory.getLast(), gameState);
+        gameStateFuture.add(gameState);
+        gameState = gameStateHistory.removeLast();
+        moveFuture.add(moveHistory.removeLast());
+        gameState.computeMoves();
+    }
+
+    private void redo() {
+        if (gameStateFuture.isEmpty()) return;
+        SoundHandler.playSound(moveFuture.getLast(), gameState, gameStateFuture.getLast());
+        gameStateHistory.add(gameState);
+        gameState = gameStateFuture.removeLast();
+        moveHistory.add(moveFuture.removeLast());
+        gameState.computeMoves();
     }
 
     private void initializeNodes(Group root) {
@@ -387,7 +444,11 @@ public class Main extends Application {
             selectedSquare = -1;
             return;
         }
-        SoundHandler.playSound(move, gameState, gameState = gameState.makeMove(move));
+        gameStateHistory.add(gameState);
+        gameStateFuture.clear();
+        moveHistory.add(move);
+        gameState = gameState.makeMove(move);
+        SoundHandler.playSound(move, gameStateHistory.getLast(), gameState);
         gameState.computeMoves();
         selectedSquare = -1;
     }
