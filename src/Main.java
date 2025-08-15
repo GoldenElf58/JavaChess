@@ -240,7 +240,10 @@ public class Main extends Application {
     }
 
     private void undo() {
-        if (gameStateHistory.isEmpty()) return;
+        if (gameStateHistory.isEmpty()) {
+            SoundHandler.playSound("click");
+            return;
+        }
         SoundHandler.playSound(moveHistory.getLast(), gameStateHistory.getLast(), gameState);
         gameStateFuture.add(gameState);
         gameState = gameStateHistory.removeLast();
@@ -249,7 +252,10 @@ public class Main extends Application {
     }
 
     private void redo() {
-        if (gameStateFuture.isEmpty()) return;
+        if (gameStateFuture.isEmpty()) {
+            SoundHandler.playSound("click");
+            return;
+        }
         SoundHandler.playSound(moveFuture.getLast(), gameState, gameStateFuture.getLast());
         gameStateHistory.add(gameState);
         gameState = gameStateFuture.removeLast();

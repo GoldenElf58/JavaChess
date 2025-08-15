@@ -10,7 +10,7 @@ public class SoundHandler {
     private static final Map<String, Media> soundCache = new HashMap<>();
     private static boolean soundsLoaded = false;
     private static final String[] files = {"move-check", "move-opponent", "move-self", "capture",
-            "castle", "promote", "game-end"};
+            "castle", "promote", "game-end", "illegal", "click"};
 
     public static void loadSounds() {
         for (String file : files) {
