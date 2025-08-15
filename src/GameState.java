@@ -113,7 +113,7 @@ public class GameState {
                     if (illegal) break;
                 }
             } else {
-                kingMoved = move[2] == 6;
+                kingMoved = move[0] >= 0 && move[2] == 6;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
                 for (int i = 0; i < 64; i++) {
                     switch (board[i] * color) { // make board local
