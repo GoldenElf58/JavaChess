@@ -22,6 +22,11 @@ import static java.lang.Math.floorDiv;
 
 public class Main extends Application {
 
+    private static final double DEFAULT_SCENE_WIDTH = 720;
+    private static final double DEFAULT_SCENE_HEIGHT = 480;
+    private static final double MIN_SCENE_WIDTH = 292;
+    private static final double MIN_SCENE_HEIGHT = 292;
+
     static final double ARROW_HEAD_LINE_RATIO = 0.2;
 
     static final double ARROW_HEAD_SMALL_RATIO = 0.5;
@@ -36,18 +41,20 @@ public class Main extends Application {
     static final double CIRCLE_RING_RATIO = 0.0833333333;
 
     private final Map<Integer, Image> imageCache = new HashMap<>();
-    private static double previousWidth;
-    private static double previousHeight;
+    private static double previousWidth = DEFAULT_SCENE_WIDTH;
+    private static double previousHeight = DEFAULT_SCENE_HEIGHT;
 
     private Scene scene;
     private Group pencilMarkings;
     private Scene pencilScene;
     private GameState gameState;
     private WritableImage pencilImage;
+
     private Rectangle[] squares;
     private Circle[] circles;
     private ImageView[] pieces;
-    private Rectangle[] borders;
+    private final Rectangle[] borders = new Rectangle[2];
+
     private int specialStartSquare = -1;
     private int selectedSquare = -1;
     private boolean dragging = true;
@@ -135,22 +142,64 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        stage.setTitle("Chess");
+        stage.setMinWidth(MIN_SCENE_WIDTH);
+        stage.setMinHeight(MIN_SCENE_HEIGHT);
+
         Group root = new Group();
         pencilMarkings = new Group();
         scene = new Scene(root, 720, 480, Color.grayRgb(0));
-        pencilScene = new Scene(pencilMarkings, 720, 480, Color.TRANSPARENT);
-        SoundHandler.loadSounds();
-        previousWidth = 720;
-        previousHeight = 480;
+        pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT, Color.TRANSPARENT);
 
-        stage.setTitle("Chess");
-        stage.setMinWidth(292);
-        stage.setMinHeight(292);
+        SoundHandler.loadSounds();
 
         pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
         gameState = new GameState();
 
+        initializeNodes(root);
+
+        stage.setScene(scene);
+        stage.show();
+
+        gameState.computeMoves();
+
+        scene.setOnMousePressed(this::onMousePressed);
+        scene.setOnMouseDragged(this::onMouseDragged);
+        scene.setOnMouseClicked(this::onMouseClicked);
+        scene.setOnMouseMoved(this::onMouseMoved);
+
+        scene.widthProperty().addListener(_ -> updatePositions());
+        scene.heightProperty().addListener(_ -> updatePositions());
+        updatePositions();
+
+        AnimationTimer gameLoop = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                loop();
+            }
+        };
+        gameLoop.start();
+    }
+
+    public void loop() {
+        displayBoard();
+
+        if (!gameState.isInProgress() && !shown) {
+            SoundHandler.playSound("game-end");
+            System.out.println(gameState);
+            System.out.println((switch (gameState.getWinner()) {
+                case 0 -> "Draw";
+                case 1 -> "White wins";
+                case -1 -> "Black wins";
+                default ->
+                        throw new IllegalStateException("Unexpected value: " + gameState.getWinner());
+            }));
+            shown = true;
+        }
+    }
+
+    private void initializeNodes(Group root) {
         squares = new Rectangle[64];
         circles = new Circle[64];
         pieces = new ImageView[64];
@@ -168,56 +217,18 @@ public class Main extends Application {
                     length / 8);
             circles[i].setFill(Color.BLACK);
         }
+
+        borders[0] = new Rectangle(0, 0, (width - height) / 2, height);
+        borders[1] = new Rectangle(width - (width - height) / 2, 0, (width - height) / 2, height);
+        ImageView iv = new ImageView(pencilImage);
+        iv.setOpacity(0.6);
+
         root.getChildren().addAll(squares);
         root.getChildren().addAll(circles);
         root.getChildren().addAll(pieces);
-
-        borders = new Rectangle[]{
-                new Rectangle(0, 0, (width - height) / 2, height),
-                new Rectangle(width - (width - height) / 2, 0, (width - height) / 2, height),
-        };
         root.getChildren().addAll(borders);
-        ImageView iv = new ImageView(pencilImage);
-        iv.setOpacity(0.6);
         root.getChildren().add(iv);
 
-        stage.setScene(scene);
-        stage.show();
-
-        gameState.computeMoves();
-
-        scene.setOnMousePressed(this::onMousePressed);
-
-        scene.setOnMouseDragged(this::onMouseDragged);
-
-        scene.setOnMouseClicked(this::onMouseClicked);
-
-        scene.setOnMouseMoved(this::onMouseMoved);
-
-        scene.widthProperty().addListener(_ -> updatePositions());
-        scene.heightProperty().addListener(_ -> updatePositions());
-        updatePositions();
-
-        AnimationTimer gameLoop = new AnimationTimer() {
-            @Override
-            public void handle(long now) {
-                displayBoard();
-
-                if (!gameState.isInProgress() && !shown) {
-                    SoundHandler.playSound("game-end");
-                    System.out.println(gameState);
-                    System.out.println((switch (gameState.getWinner()) {
-                        case 0 -> "Draw";
-                        case 1 -> "White wins";
-                        case -1 -> "Black wins";
-                        default ->
-                                throw new IllegalStateException("Unexpected value: " + gameState.getWinner());
-                    }));
-                    shown = true;
-                }
-            }
-        };
-        gameLoop.start();
     }
 
     private void onMousePressed(MouseEvent e) {
@@ -228,8 +239,8 @@ public class Main extends Application {
             if (square == -1) return;
             specialStartSquare = square;
             scene.setCursor(Cursor.HAND);
-            pencilMarkings.getChildren().add(new Group());
-            pencilMarkings.getChildren().add(new Group());
+            addBlank(pencilMarkings.getChildren());
+            addBlank(pencilMarkings.getChildren());
             drawRing(scene, pencilMarkings, square);
             pencilScene.snapshot(pencilImage);
             return;
@@ -280,7 +291,7 @@ public class Main extends Application {
 
     private void onMouseClicked(MouseEvent e) {
         int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
-        double squareWidth = scene.getHeight() / 8;
+        double length = scene.getHeight() / 8;
         if (e.getButton() == MouseButton.SECONDARY) {
             ObservableList<Node> children = pencilMarkings.getChildren();
             if (children.getLast() instanceof Group) {
@@ -289,9 +300,9 @@ public class Main extends Application {
                 if (currSquare == specialStartSquare) {
                     Circle circle = new Circle(getX(scene, currSquare) + offset,
                             getY(scene, currSquare) + offset,
-                            offset - squareWidth * CIRCLE_RING_RATIO / 2);
+                            offset - length * CIRCLE_RING_RATIO / 2);
                     circle.setFill(Color.TRANSPARENT);
-                    circle.setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
+                    circle.setStrokeWidth(length * CIRCLE_RING_RATIO);
                     for (Node child : children.reversed()) {
                         if (child instanceof Circle && equals((Circle) child, circle)) {
                             children.removeLast();
@@ -307,7 +318,7 @@ public class Main extends Application {
                             getY(scene, specialStartSquare) + offset,
                             getX(scene, currSquare) + offset,
                             getY(scene, currSquare) + offset,
-                            squareWidth * ARROW_HEAD_LINE_RATIO);
+                            length * ARROW_HEAD_LINE_RATIO);
                     Iterator<Node> it = children.iterator();
                     while (it.hasNext()) {
                         Node child = it.next();
@@ -334,16 +345,16 @@ public class Main extends Application {
                 return;
             }
             if (children.getLast() instanceof Line) {
-                ((Line) children.getLast()).setStrokeWidth(squareWidth * LINE_WIDTH_RATIO);
+                ((Line) children.getLast()).setStrokeWidth(length * LINE_WIDTH_RATIO);
                 children.getLast().setOpacity(1);
                 ((Arrow) children.get(children.size() - 2))
-                        .setStrokeWidth(squareWidth * ARROW_STROKE_RATIO);
+                        .setStrokeWidth(length * ARROW_STROKE_RATIO);
                 ((Arrow) children.get(children.size() - 2))
-                        .setArrowHeadSize(squareWidth * ARROW_HEAD_RATIO);
+                        .setArrowHeadSize(length * ARROW_HEAD_RATIO);
                 children.get(children.size() - 2).setOpacity(1);
             } else if (children.getLast() instanceof Circle &&
-                    ((Circle) children.getLast()).getStrokeWidth() == squareWidth * CIRCLE_RING_SMALL_RATIO) {
-                ((Circle) children.getLast()).setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
+                    ((Circle) children.getLast()).getStrokeWidth() == length * CIRCLE_RING_SMALL_RATIO) {
+                ((Circle) children.getLast()).setStrokeWidth(length * CIRCLE_RING_RATIO);
                 children.getLast().setOpacity(1);
             }
             pencilScene.snapshot(pencilImage);
@@ -476,47 +487,54 @@ public class Main extends Application {
     }
 
     public void displayBoard() {
-        double length = scene.getHeight() / 8;
-        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
         for (int i = 0; i < 64; i++) {
-            int pieceType = gameState.getBoard()[i];
-            Rectangle sq = squares[i];
+            displayTile(i);
+            displayPiece(i);
+        }
+    }
 
-            circles[i].setVisible(false);
-            circles[i].setRadius(pieceType == 0 ? length / 7 : length / 1.8);
-            boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
-            if (i == selectedSquare) {
-                sq.setFill(Colors.getSquareSelectedColor(lightSquare));
-            } else if (gameState.findMove(selectedSquare, i) != null) {
-                if (mouseSquare == i) sq.setFill(Colors.getSquareHoverColor(lightSquare));
-                else {
-                    if (pieceType == 0) {
-                        sq.setFill(Colors.getSquareBaseColor(lightSquare));
-                        circles[i].setVisible(true);
-                        circles[i].setFill(Colors.getSquareSelectedColor(lightSquare));
-                    } else {
-                        sq.setFill(Colors.getSquareHoverColor(lightSquare));
-                        circles[i].setVisible(true);
-                        circles[i].setFill(Colors.getSquareBaseColor(lightSquare));
-                        circles[i].toBack();
-                        sq.toBack();
-                    }
-                }
-            } else sq.setFill(Colors.getSquareBaseColor(lightSquare));
+    private void displayTile(int i) {
+        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+        double squareWidth = scene.getHeight() / 8;
+        int pieceType = gameState.getBoard()[i];
+        Rectangle sq = squares[i];
+        circles[i].setVisible(false);
+        circles[i].setRadius(pieceType == 0 ? squareWidth / 7 : squareWidth / 1.8);
 
-            ImageView piece = pieces[i];
-            if (pieceType == 0) {
-                piece.setVisible(false);
-                continue;
+        boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
+        sq.setFill(Colors.getSquareBaseColor(lightSquare));
+        if (i == selectedSquare) {
+            sq.setFill(Colors.getSquareSelectedColor(lightSquare));
+        } else if (gameState.findMove(selectedSquare, i) != null) {
+            if (mouseSquare == i) sq.setFill(Colors.getSquareHoverColor(lightSquare));
+            else if (pieceType == 0) {
+                circles[i].setVisible(true);
+                circles[i].setFill(Colors.getSquareSelectedColor(lightSquare));
+            } else {
+                sq.setFill(Colors.getSquareHoverColor(lightSquare));
+                circles[i].setVisible(true);
+                circles[i].setFill(Colors.getSquareBaseColor(lightSquare));
+                circles[i].toBack();
+                sq.toBack();
             }
-            piece.setVisible(true);
-            piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
-                    new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
-            if (i == selectedSquare && dragging) {
-                piece.setX(mousePose[0] - length / 2);
-                piece.setY(mousePose[1] - length / 2);
-                piece.toFront();
-            }
+        }
+    }
+
+    private void displayPiece(int i) {
+        int pieceType = gameState.getBoard()[i];
+        double squareWidth = scene.getHeight() / 8;
+        ImageView piece = pieces[i];
+        if (pieceType == 0) {
+            piece.setVisible(false);
+            return;
+        }
+        piece.setVisible(true);
+        piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
+                new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
+        if (i == selectedSquare && dragging) {
+            piece.setX(mousePose[0] - squareWidth / 2);
+            piece.setY(mousePose[1] - squareWidth / 2);
+            piece.toFront();
         }
     }
 

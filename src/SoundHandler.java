@@ -9,10 +9,10 @@ public class SoundHandler {
 
     private static final Map<String, Media> soundCache = new HashMap<>();
     private static boolean soundsLoaded = false;
+    private static final String[] files = {"move-check", "move-opponent", "move-self", "capture",
+            "castle", "promote", "game-end"};
 
     public static void loadSounds() {
-        String[] files = {"move-check", "move-opponent", "move-self", "capture", "castle",
-                "promote", "game-end"};
         for (String file : files) {
             Media media = new Media(new File("src/sounds/" + file + ".mp3").toURI().toString());
             soundCache.put(file, media);
