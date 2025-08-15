@@ -144,7 +144,7 @@ public class Main extends Application {
         double ciUpper = mean + margin;
 
         System.out.printf("Average half-moves/game: %.2f%n", mean);
-        System.out.printf("95%% CI (half-moves/game): [%.2f, %.2f]%n", ciLower, ciUpper);
+        System.out.printf("95%% CI (half-moves/game): (%.2f, %.2f)%n", ciLower, ciUpper);
     }
 
     @Override
@@ -235,6 +235,7 @@ public class Main extends Application {
             }
             case COMMAND -> command = true;
             case SHIFT -> shift = true;
+            default -> System.out.println(e.getCode());
         }
     }
 
@@ -302,6 +303,8 @@ public class Main extends Application {
             pencilScene.snapshot(pencilImage);
             return;
         }
+        if (e.getButton() == MouseButton.BACK) undo();
+        else if (e.getButton() == MouseButton.FORWARD) redo();
         if (e.getButton() != MouseButton.PRIMARY) return;
         pencilMarkings.getChildren().clear();
         pencilScene.snapshot(pencilImage);
@@ -351,6 +354,7 @@ public class Main extends Application {
         double length = scene.getHeight() / 8;
         if (e.getButton() == MouseButton.SECONDARY) {
             ObservableList<Node> children = pencilMarkings.getChildren();
+            if (children.isEmpty()) return;
             if (children.getLast() instanceof Group) {
                 children.removeLast();
                 double offset = scene.getHeight() / 16;
