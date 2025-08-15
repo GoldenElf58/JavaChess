@@ -9,6 +9,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
 import javafx.stage.Stage;
@@ -16,7 +17,6 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.floorDiv;
 
@@ -38,6 +38,22 @@ public class Main extends Application {
     private final Map<Integer, Image> imageCache = new HashMap<>();
     private static double previousWidth;
     private static double previousHeight;
+
+    private Scene scene;
+    private Group pencilMarkings;
+    private Scene pencilScene;
+    private GameState gameState;
+    private WritableImage pencilImage;
+    private Rectangle[] squares;
+    private Circle[] circles;
+    private ImageView[] pieces;
+    private Rectangle[] borders;
+    private int specialStartSquare = -1;
+    private int selectedSquare = -1;
+    private boolean dragging = true;
+    private final double[] mousePose = {-1, -1};
+    private boolean firstSelection = false;
+    private boolean shown = false;
 
     public static void main(String[] args) {
         launch(args);
@@ -120,9 +136,9 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) {
         Group root = new Group();
-        Group pencilMarkings = new Group();
-        Scene scene = new Scene(root, 720, 480, Color.grayRgb(0));
-        Scene pencilScene = new Scene(pencilMarkings, 720, 480, Color.TRANSPARENT);
+        pencilMarkings = new Group();
+        scene = new Scene(root, 720, 480, Color.grayRgb(0));
+        pencilScene = new Scene(pencilMarkings, 720, 480, Color.TRANSPARENT);
         SoundHandler.loadSounds();
         previousWidth = 720;
         previousHeight = 480;
@@ -131,13 +147,13 @@ public class Main extends Application {
         stage.setMinWidth(292);
         stage.setMinHeight(292);
 
-        WritableImage pencilImage = new WritableImage(3840, 2160);
+        pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
-        final GameState[] gameStates = {new GameState()};
+        gameState = new GameState();
 
-        Rectangle[] squares = new Rectangle[64];
-        Circle[] circles = new Circle[64];
-        ImageView[] pieces = new ImageView[64];
+        squares = new Rectangle[64];
+        circles = new Circle[64];
+        pieces = new ImageView[64];
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
@@ -156,7 +172,7 @@ public class Main extends Application {
         root.getChildren().addAll(circles);
         root.getChildren().addAll(pieces);
 
-        Rectangle[] borders = {
+        borders = new Rectangle[]{
                 new Rectangle(0, 0, (width - height) / 2, height),
                 new Rectangle(width - (width - height) / 2, 0, (width - height) / 2, height),
         };
@@ -168,222 +184,26 @@ public class Main extends Application {
         stage.setScene(scene);
         stage.show();
 
-        gameStates[0].computeMoves();
+        gameState.computeMoves();
 
-        final boolean[] shown = {false};
-        AtomicInteger selectedSquare = new AtomicInteger(-1);
-        AtomicInteger specialStartSquare = new AtomicInteger(-1);
-        double[] mousePose = {-1, -1};
-        boolean[] dragging = {false};
-        boolean[] firstSelection = {true};
+        scene.setOnMousePressed(this::onMousePressed);
 
-        scene.setOnMousePressed(e -> {
-            int square = getSquare(scene, (int) e.getX(), (int) e.getY());
-            if (e.getButton() == MouseButton.SECONDARY) {
-                selectedSquare.set(-1);
-                dragging[0] = false;
-                if (square == -1) return;
-                specialStartSquare.set(square);
-                scene.setCursor(Cursor.HAND);
-                pencilMarkings.getChildren().add(new Group());
-                pencilMarkings.getChildren().add(new Group());
-                drawRing(scene, pencilMarkings, square);
-                pencilScene.snapshot(pencilImage);
-                return;
-            }
-            if (e.getButton() != MouseButton.PRIMARY) return;
-            pencilMarkings.getChildren().clear();
-            pencilScene.snapshot(pencilImage);
-            GameState gameState = gameStates[0];
-            if (square == -1) return;
-            boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
-            if (!canSelect) {
-                firstSelection[0] = true;
-                selectedSquare.set(-1);
-                return;
-            }
-            int[] move = gameState.findMove(selectedSquare.get(), square);
-            if (move == null) {
-                dragging[0] = true;
-                mousePose[0] = e.getX();
-                mousePose[1] = e.getY();
-                if (selectedSquare.get() != square) firstSelection[0] = true;
-                scene.setCursor(Cursor.CLOSED_HAND);
-                selectedSquare.set(square);
-                return;
-            }
-            gameStates[0] = gameState.makeMove(move);
-            SoundHandler.playSound(move, gameState, gameStates[0]);
-            gameStates[0].computeMoves();
-            firstSelection[0] = true;
-            selectedSquare.set(-1);
-        });
+        scene.setOnMouseDragged(this::onMouseDragged);
 
-        scene.setOnMouseDragged(e -> {
-            if (e.getButton() == MouseButton.SECONDARY) {
-                int square = getSquare(scene, (int) e.getX(), (int) e.getY());
-                dragging[0] = false;
-                if (square == -1) return;
-                scene.setCursor(Cursor.HAND);
-                if (specialStartSquare.get() == square)
-                    drawRing(scene, pencilMarkings, square);
-                else drawArrow(scene, pencilMarkings, specialStartSquare.get(), square);
-                pencilScene.snapshot(pencilImage);
-                return;
-            }
-            if (e.getButton() != MouseButton.PRIMARY) return;
-            mousePose[0] = e.getX();
-            mousePose[1] = e.getY();
-            dragging[0] = selectedSquare.get() != -1;
-        });
+        scene.setOnMouseClicked(this::onMouseClicked);
 
-        scene.setOnMouseClicked(e -> {
-            int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
-            double squareWidth = scene.getHeight() / 8;
-            if (e.getButton() == MouseButton.SECONDARY) {
-                ObservableList<Node> children = pencilMarkings.getChildren();
-                if (children.getLast() instanceof Group) {
-                    children.removeLast();
-                    double offset = scene.getHeight() / 16;
-                    if (currSquare == specialStartSquare.get()) {
-                        Circle circle = new Circle(getX(scene, currSquare) + offset,
-                                getY(scene, currSquare) + offset,
-                                offset - squareWidth * CIRCLE_RING_RATIO / 2);
-                        circle.setFill(Color.TRANSPARENT);
-                        circle.setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
-                        for (Node child : children.reversed()) {
-                            if (child instanceof Circle && equals((Circle) child, circle)) {
-                                children.removeLast();
-                                child.setVisible(!child.isVisible());
-                                child.setManaged(!child.isManaged());
-                                break;
-                            }
-                        }
-                    } else {
-                        children.removeLast();
-                        Arrow arrow = new Arrow(
-                                getX(scene, specialStartSquare.get()) + offset,
-                                getY(scene, specialStartSquare.get()) + offset,
-                                getX(scene, currSquare) + offset,
-                                getY(scene, currSquare) + offset,
-                                squareWidth * ARROW_HEAD_LINE_RATIO);
-                        Iterator<Node> it = children.iterator();
-                        while (it.hasNext()) {
-                            Node child = it.next();
-                            if (child instanceof Arrow &&
-                                    ((Arrow) child).equals(new Arrow(
-                                            getX(scene, specialStartSquare.get()) + offset,
-                                            getY(scene, specialStartSquare.get()) + offset,
-                                            getX(scene, currSquare) + offset,
-                                            getY(scene, currSquare) + offset))) {
-                                it.remove();
-                            }
-                            if (child instanceof Line &&
-                                    equals((Line) child, new Line(
-                                            arrow.getStartX(), arrow.getStartY(),
-                                            arrow.getX3(), arrow.getY3()))) {
-                                it.remove();
-                            }
-                        }
-                    }
-                }
-                if (children.isEmpty()) {
-                    pencilScene.snapshot(pencilImage);
-                    scene.setCursor(Cursor.DEFAULT);
-                    return;
-                }
-                if (children.getLast() instanceof Line) {
-                    ((Line) children.getLast()).setStrokeWidth(squareWidth * LINE_WIDTH_RATIO);
-                    children.getLast().setOpacity(1);
-                    ((Arrow) children.get(children.size() - 2))
-                            .setStrokeWidth(squareWidth * ARROW_STROKE_RATIO);
-                    ((Arrow) children.get(children.size() - 2))
-                            .setArrowHeadSize(squareWidth * ARROW_HEAD_RATIO);
-                    children.get(children.size() - 2).setOpacity(1);
-                } else if (children.getLast() instanceof Circle &&
-                        ((Circle) children.getLast()).getStrokeWidth() == squareWidth * CIRCLE_RING_SMALL_RATIO) {
-                    ((Circle) children.getLast()).setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
-                    children.getLast().setOpacity(1);
-                }
-                pencilScene.snapshot(pencilImage);
-                scene.setCursor(Cursor.DEFAULT);
-                return;
-            }
-            if (e.getButton() != MouseButton.PRIMARY) return;
-            if (!dragging[0]) return;
-            dragging[0] = false;
-            pieces[selectedSquare.get()].setX(getX(scene, selectedSquare.get()));
-            pieces[selectedSquare.get()].setY(getY(scene, selectedSquare.get()));
-            scene.setCursor(Cursor.DEFAULT);
-            GameState gameState = gameStates[0];
-            int square = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
-            if (square == -1) return;
-            boolean canSelect = canSelectSquare(gameState, selectedSquare.get(), square);
-            if (!canSelect) {
-                selectedSquare.set(-1);
-                firstSelection[0] = true;
-                return;
-            }
-            int[] move = gameState.findMove(selectedSquare.get(), square);
-            if (move == null) {
-                if (selectedSquare.get() == square) {
-                    scene.setCursor(Cursor.OPEN_HAND);
-                    selectedSquare.set(firstSelection[0] ? square : -1);
-                    firstSelection[0] = !firstSelection[0];
-                    return;
-                }
-                firstSelection[0] = true;
-                selectedSquare.set(-1);
-                return;
-            }
-            gameStates[0] = gameState.makeMove(move);
-            SoundHandler.playSound(move, gameState, gameStates[0]);
-            gameStates[0].computeMoves();
-            selectedSquare.set(-1);
-        });
+        scene.setOnMouseMoved(this::onMouseMoved);
 
-        scene.setOnMouseMoved(e -> {
-            mousePose[0] = e.getX();
-            mousePose[1] = e.getY();
-            dragging[0] = false;
-            if (selectedSquare.get() != -1) {
-                pieces[selectedSquare.get()].setX(getX(scene, selectedSquare.get()));
-                pieces[selectedSquare.get()].setY(getY(scene, selectedSquare.get()));
-                firstSelection[0] = false;
-            }
-            GameState gameState = gameStates[0];
-            int square = getSquare(scene, (int) e.getX(), (int) e.getY());
-            if (square == -1 || !canSelectSquare(gameState, selectedSquare.get(), square)) {
-                scene.setCursor(Cursor.DEFAULT);
-                return;
-            }
-            if (selectedSquare.get() == -1) {
-                scene.setCursor(Cursor.OPEN_HAND);
-                return;
-            }
-            scene.setCursor(gameState.findMove(selectedSquare.get(), square) == null ?
-                    Cursor.OPEN_HAND : Cursor.HAND);
-        });
-
-        scene.widthProperty().addListener(_ -> {
-            updatePositions(scene, squares, circles, pieces, borders, pencilMarkings.getChildren());
-            pencilScene.snapshot(pencilImage);
-        });
-        scene.heightProperty().addListener(_ -> {
-            updatePositions(scene, squares, circles, pieces, borders, pencilMarkings.getChildren());
-            pencilScene.snapshot(pencilImage);
-        });
-        updatePositions(scene, squares, circles, pieces, borders, pencilMarkings.getChildren());
+        scene.widthProperty().addListener(_ -> updatePositions());
+        scene.heightProperty().addListener(_ -> updatePositions());
+        updatePositions();
 
         AnimationTimer gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                GameState gameState = gameStates[0];
+                displayBoard();
 
-                displayBoard(scene, gameState, squares, circles, pieces, selectedSquare.get(),
-                        mousePose, dragging[0]);
-
-                if (!gameState.isInProgress() && !shown[0]) {
+                if (!gameState.isInProgress() && !shown) {
                     SoundHandler.playSound("game-end");
                     System.out.println(gameState);
                     System.out.println((switch (gameState.getWinner()) {
@@ -393,11 +213,311 @@ public class Main extends Application {
                         default ->
                                 throw new IllegalStateException("Unexpected value: " + gameState.getWinner());
                     }));
-                    shown[0] = true;
+                    shown = true;
                 }
             }
         };
         gameLoop.start();
+    }
+
+    private void onMousePressed(MouseEvent e) {
+        int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+        if (e.getButton() == MouseButton.SECONDARY) {
+            selectedSquare = -1;
+            dragging = false;
+            if (square == -1) return;
+            specialStartSquare = square;
+            scene.setCursor(Cursor.HAND);
+            pencilMarkings.getChildren().add(new Group());
+            pencilMarkings.getChildren().add(new Group());
+            drawRing(scene, pencilMarkings, square);
+            pencilScene.snapshot(pencilImage);
+            return;
+        }
+        if (e.getButton() != MouseButton.PRIMARY) return;
+        pencilMarkings.getChildren().clear();
+        pencilScene.snapshot(pencilImage);
+        if (square == -1) return;
+        boolean canSelect = canSelectSquare(gameState, selectedSquare, square);
+        if (!canSelect) {
+            firstSelection = true;
+            selectedSquare = -1;
+            return;
+        }
+        int[] move = gameState.findMove(selectedSquare, square);
+        if (move == null) {
+            dragging = true;
+            mousePose[0] = e.getX();
+            mousePose[1] = e.getY();
+            if (selectedSquare != square) firstSelection = true;
+            scene.setCursor(Cursor.CLOSED_HAND);
+            selectedSquare = square;
+            return;
+        }
+        SoundHandler.playSound(move, gameState, gameState = gameState.makeMove(move));
+        gameState.computeMoves();
+        firstSelection = true;
+        selectedSquare = -1;
+    }
+
+    private void onMouseDragged(MouseEvent e) {
+        if (e.getButton() == MouseButton.SECONDARY) {
+            int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+            dragging = false;
+            if (square == -1) return;
+            scene.setCursor(Cursor.HAND);
+            if (specialStartSquare == square)
+                drawRing(scene, pencilMarkings, square);
+            else drawArrow(scene, pencilMarkings, specialStartSquare, square);
+            pencilScene.snapshot(pencilImage);
+            return;
+        }
+        if (e.getButton() != MouseButton.PRIMARY) return;
+        mousePose[0] = e.getX();
+        mousePose[1] = e.getY();
+        dragging = selectedSquare != -1;
+    }
+
+    private void onMouseClicked(MouseEvent e) {
+        int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
+        double squareWidth = scene.getHeight() / 8;
+        if (e.getButton() == MouseButton.SECONDARY) {
+            ObservableList<Node> children = pencilMarkings.getChildren();
+            if (children.getLast() instanceof Group) {
+                children.removeLast();
+                double offset = scene.getHeight() / 16;
+                if (currSquare == specialStartSquare) {
+                    Circle circle = new Circle(getX(scene, currSquare) + offset,
+                            getY(scene, currSquare) + offset,
+                            offset - squareWidth * CIRCLE_RING_RATIO / 2);
+                    circle.setFill(Color.TRANSPARENT);
+                    circle.setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
+                    for (Node child : children.reversed()) {
+                        if (child instanceof Circle && equals((Circle) child, circle)) {
+                            children.removeLast();
+                            child.setVisible(!child.isVisible());
+                            child.setManaged(!child.isManaged());
+                            break;
+                        }
+                    }
+                } else {
+                    children.removeLast();
+                    Arrow arrow = new Arrow(
+                            getX(scene, specialStartSquare) + offset,
+                            getY(scene, specialStartSquare) + offset,
+                            getX(scene, currSquare) + offset,
+                            getY(scene, currSquare) + offset,
+                            squareWidth * ARROW_HEAD_LINE_RATIO);
+                    Iterator<Node> it = children.iterator();
+                    while (it.hasNext()) {
+                        Node child = it.next();
+                        if (child instanceof Arrow &&
+                                ((Arrow) child).equals(new Arrow(
+                                        getX(scene, specialStartSquare) + offset,
+                                        getY(scene, specialStartSquare) + offset,
+                                        getX(scene, currSquare) + offset,
+                                        getY(scene, currSquare) + offset))) {
+                            it.remove();
+                        }
+                        if (child instanceof Line &&
+                                equals((Line) child, new Line(
+                                        arrow.getStartX(), arrow.getStartY(),
+                                        arrow.getX3(), arrow.getY3()))) {
+                            it.remove();
+                        }
+                    }
+                }
+            }
+            if (children.isEmpty()) {
+                pencilScene.snapshot(pencilImage);
+                scene.setCursor(Cursor.DEFAULT);
+                return;
+            }
+            if (children.getLast() instanceof Line) {
+                ((Line) children.getLast()).setStrokeWidth(squareWidth * LINE_WIDTH_RATIO);
+                children.getLast().setOpacity(1);
+                ((Arrow) children.get(children.size() - 2))
+                        .setStrokeWidth(squareWidth * ARROW_STROKE_RATIO);
+                ((Arrow) children.get(children.size() - 2))
+                        .setArrowHeadSize(squareWidth * ARROW_HEAD_RATIO);
+                children.get(children.size() - 2).setOpacity(1);
+            } else if (children.getLast() instanceof Circle &&
+                    ((Circle) children.getLast()).getStrokeWidth() == squareWidth * CIRCLE_RING_SMALL_RATIO) {
+                ((Circle) children.getLast()).setStrokeWidth(squareWidth * CIRCLE_RING_RATIO);
+                children.getLast().setOpacity(1);
+            }
+            pencilScene.snapshot(pencilImage);
+            scene.setCursor(Cursor.DEFAULT);
+            return;
+        }
+        if (e.getButton() != MouseButton.PRIMARY) return;
+        if (!dragging) return;
+        dragging = false;
+        pieces[selectedSquare].setX(getX(scene, selectedSquare));
+        pieces[selectedSquare].setY(getY(scene, selectedSquare));
+        scene.setCursor(Cursor.DEFAULT);
+        int square = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+        if (square == -1) return;
+        boolean canSelect = canSelectSquare(gameState, selectedSquare, square);
+        if (!canSelect) {
+            selectedSquare = -1;
+            firstSelection = true;
+            return;
+        }
+        int[] move = gameState.findMove(selectedSquare, square);
+        if (move == null) {
+            if (selectedSquare == square) {
+                scene.setCursor(Cursor.OPEN_HAND);
+                selectedSquare = firstSelection ? square : -1;
+                firstSelection = !firstSelection;
+                return;
+            }
+            firstSelection = true;
+            selectedSquare = -1;
+            return;
+        }
+        SoundHandler.playSound(move, gameState, gameState = gameState.makeMove(move));
+        gameState.computeMoves();
+        selectedSquare = -1;
+    }
+
+    private void onMouseMoved(MouseEvent e) {
+        mousePose[0] = e.getX();
+        mousePose[1] = e.getY();
+        dragging = false;
+        if (selectedSquare != -1) {
+            pieces[selectedSquare].setX(getX(scene, selectedSquare));
+            pieces[selectedSquare].setY(getY(scene, selectedSquare));
+            firstSelection = false;
+        }
+        int square = getSquare(scene, (int) e.getX(), (int) e.getY());
+        if (square == -1 || !canSelectSquare(gameState, selectedSquare, square)) {
+            scene.setCursor(Cursor.DEFAULT);
+            return;
+        }
+        if (selectedSquare == -1) {
+            scene.setCursor(Cursor.OPEN_HAND);
+            return;
+        }
+        scene.setCursor(gameState.findMove(selectedSquare, square) == null ?
+                Cursor.OPEN_HAND : Cursor.HAND);
+    }
+
+    public void updatePositions() {
+        double width = scene.getWidth();
+        double height = scene.getHeight();
+        double length = height / 8;
+        if (width < 292 - 28) {
+            System.out.println(width + " " + height);
+            width = 292 - 28;
+        }
+        if (height < 292 - 28) {
+            System.out.println(width + " " + height);
+            height = 292 - 28;
+            length = height / 8;
+        }
+        borders[0].setHeight(scene.getHeight());
+        borders[0].setWidth((width - height) / 2);
+        borders[1].setHeight(scene.getHeight());
+        borders[1].setWidth((width - height) / 2);
+        borders[1].setX(width - (width - height) / 2);
+        for (int i = 0; i < 64; i++) {
+            double x = getX(width, height, i);
+            double y = getY(height, i);
+            Rectangle sq = squares[i];
+            sq.setWidth(length);
+            sq.setHeight(length);
+            sq.setX(x);
+            sq.setY(y);
+            circles[i].setCenterX(x + length / 2);
+            circles[i].setCenterY(y + length / 2);
+            pieces[i].setX(x);
+            pieces[i].setY(y);
+            pieces[i].setFitHeight(length);
+            pieces[i].setFitWidth(length);
+        }
+        for (Node child : pencilMarkings.getChildren()) {
+            if (child instanceof Circle) {
+                int square = getSquare(previousWidth, previousHeight,
+                        (int) ((Circle) child).getCenterX(), (int) ((Circle) child).getCenterY());
+                ((Circle) child).setCenterX(getX(width, height, square) + length / 2);
+                ((Circle) child).setCenterY(getY(height, square) + length / 2);
+                ((Circle) child).setStrokeWidth(length * CIRCLE_RING_RATIO);
+                ((Circle) child).setRadius(length / 2 - ((Circle) child).getStrokeWidth() / 2);
+            } else if (child instanceof Line) {
+                int startSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Line) child).getStartX(), (int) ((Line) child).getStartY());
+                int endSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Line) child).getEndX(), (int) ((Line) child).getEndY());
+                Arrow arrow = new Arrow(getX(scene, startSquare) + length / 2,
+                        getY(scene, startSquare) + length / 2, getX(scene, endSquare) + length / 2,
+                        getY(scene, endSquare) + length / 2, length * ARROW_HEAD_LINE_RATIO);
+                ((Line) child).setStartX(arrow.getStartX());
+                ((Line) child).setStartY(arrow.getStartY());
+                ((Line) child).setEndX(arrow.getX3());
+                ((Line) child).setEndY(arrow.getY3());
+                ((Line) child).setStrokeWidth(length * LINE_WIDTH_RATIO);
+            } else if (child instanceof Arrow) {
+                int startSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Arrow) child).getStartX(), (int) ((Arrow) child).getStartY());
+                int endSquare = getSquare(previousWidth, previousHeight,
+                        (int) ((Arrow) child).getEndX(), (int) ((Arrow) child).getEndY());
+                ((Arrow) child).setStartX(getX(width, height, startSquare) + length / 2);
+                ((Arrow) child).setStartY(getY(height, startSquare) + length / 2);
+                ((Arrow) child).setEndX(getX(width, height, endSquare) + length / 2);
+                ((Arrow) child).setEndY(getY(height, endSquare) + length / 2);
+                ((Arrow) child).setStrokeWidth(length * ARROW_STROKE_RATIO);
+                ((Arrow) child).setArrowHeadSize(length * ARROW_HEAD_RATIO);
+            }
+        }
+        pencilScene.snapshot(pencilImage);
+        previousWidth = width;
+        previousHeight = height;
+    }
+
+    public void displayBoard() {
+        double length = scene.getHeight() / 8;
+        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
+        for (int i = 0; i < 64; i++) {
+            int pieceType = gameState.getBoard()[i];
+            Rectangle sq = squares[i];
+
+            circles[i].setVisible(false);
+            circles[i].setRadius(pieceType == 0 ? length / 7 : length / 1.8);
+            boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
+            if (i == selectedSquare) {
+                sq.setFill(Colors.getSquareSelectedColor(lightSquare));
+            } else if (gameState.findMove(selectedSquare, i) != null) {
+                if (mouseSquare == i) sq.setFill(Colors.getSquareHoverColor(lightSquare));
+                else {
+                    if (pieceType == 0) {
+                        sq.setFill(Colors.getSquareBaseColor(lightSquare));
+                        circles[i].setVisible(true);
+                        circles[i].setFill(Colors.getSquareSelectedColor(lightSquare));
+                    } else {
+                        sq.setFill(Colors.getSquareHoverColor(lightSquare));
+                        circles[i].setVisible(true);
+                        circles[i].setFill(Colors.getSquareBaseColor(lightSquare));
+                        circles[i].toBack();
+                        sq.toBack();
+                    }
+                }
+            } else sq.setFill(Colors.getSquareBaseColor(lightSquare));
+
+            ImageView piece = pieces[i];
+            if (pieceType == 0) {
+                piece.setVisible(false);
+                continue;
+            }
+            piece.setVisible(true);
+            piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
+                    new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
+            if (i == selectedSquare && dragging) {
+                piece.setX(mousePose[0] - length / 2);
+                piece.setY(mousePose[1] - length / 2);
+                piece.toFront();
+            }
+        }
     }
 
     public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
@@ -474,126 +594,6 @@ public class Main extends Application {
     public static boolean equals(Line l1, Line l2) {
         return l1.getStartX() == l2.getStartX() && l1.getStartY() == l2.getStartY() &&
                 l1.getEndX() == l2.getEndX() && l1.getEndY() == l2.getEndY();
-    }
-
-    public void updatePositions(Scene scene, Rectangle[] squares, Circle[] circles,
-                                ImageView[] pieces, Rectangle[] borders,
-                                ObservableList<Node> pencilChildren) {
-        double width = scene.getWidth();
-        double height = scene.getHeight();
-        double length = height / 8;
-        if (width < 292 - 28) {
-            System.out.println(width + " " + height);
-            width = 292 - 28;
-        }
-        if (height < 292 - 28) {
-            System.out.println(width + " " + height);
-            height = 292 - 28;
-            length = height / 8;
-        }
-        borders[0].setHeight(scene.getHeight());
-        borders[0].setWidth((width - height) / 2);
-        borders[1].setHeight(scene.getHeight());
-        borders[1].setWidth((width - height) / 2);
-        borders[1].setX(width - (width - height) / 2);
-        for (int i = 0; i < 64; i++) {
-            double x = getX(width, height, i);
-            double y = getY(height, i);
-            Rectangle sq = squares[i];
-            sq.setWidth(length);
-            sq.setHeight(length);
-            sq.setX(x);
-            sq.setY(y);
-            circles[i].setCenterX(x + length / 2);
-            circles[i].setCenterY(y + length / 2);
-            pieces[i].setX(x);
-            pieces[i].setY(y);
-            pieces[i].setFitHeight(length);
-            pieces[i].setFitWidth(length);
-        }
-        for (Node child : pencilChildren) {
-            if (child instanceof Circle) {
-                int square = getSquare(previousWidth, previousHeight,
-                        (int) ((Circle) child).getCenterX(), (int) ((Circle) child).getCenterY());
-                ((Circle) child).setCenterX(getX(width, height, square) + length / 2);
-                ((Circle) child).setCenterY(getY(height, square) + length / 2);
-                ((Circle) child).setStrokeWidth(length * CIRCLE_RING_RATIO);
-                ((Circle) child).setRadius(length / 2 - ((Circle) child).getStrokeWidth() / 2);
-            } else if (child instanceof Line) {
-                int startSquare = getSquare(previousWidth, previousHeight,
-                        (int) ((Line) child).getStartX(), (int) ((Line) child).getStartY());
-                int endSquare = getSquare(previousWidth, previousHeight,
-                        (int) ((Line) child).getEndX(), (int) ((Line) child).getEndY());
-                Arrow arrow = new Arrow(getX(scene, startSquare) + length / 2,
-                        getY(scene, startSquare) + length / 2, getX(scene, endSquare) + length / 2,
-                        getY(scene, endSquare) + length / 2, length * ARROW_HEAD_LINE_RATIO);
-                ((Line) child).setStartX(arrow.getStartX());
-                ((Line) child).setStartY(arrow.getStartY());
-                ((Line) child).setEndX(arrow.getX3());
-                ((Line) child).setEndY(arrow.getY3());
-                ((Line) child).setStrokeWidth(length * LINE_WIDTH_RATIO);
-            } else if (child instanceof Arrow) {
-                int startSquare = getSquare(previousWidth, previousHeight,
-                        (int) ((Arrow) child).getStartX(), (int) ((Arrow) child).getStartY());
-                int endSquare = getSquare(previousWidth, previousHeight,
-                        (int) ((Arrow) child).getEndX(), (int) ((Arrow) child).getEndY());
-                ((Arrow) child).setStartX(getX(width, height, startSquare) + length / 2);
-                ((Arrow) child).setStartY(getY(height, startSquare) + length / 2);
-                ((Arrow) child).setEndX(getX(width, height, endSquare) + length / 2);
-                ((Arrow) child).setEndY(getY(height, endSquare) + length / 2);
-                ((Arrow) child).setStrokeWidth(length * ARROW_STROKE_RATIO);
-                ((Arrow) child).setArrowHeadSize(length * ARROW_HEAD_RATIO);
-            }
-        }
-        previousWidth = width;
-        previousHeight = height;
-    }
-
-    public void displayBoard(Scene scene, GameState gameState, Rectangle[] squares,
-                             Circle[] circles, ImageView[] pieces, int selectedSquare,
-                             double[] mousePose, boolean dragging) {
-        double length = scene.getHeight() / 8;
-        int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
-        for (int i = 0; i < 64; i++) {
-            int pieceType = gameState.getBoard()[i];
-            Rectangle sq = squares[i];
-
-            circles[i].setVisible(false);
-            circles[i].setRadius(pieceType == 0 ? length / 7 : length / 1.8);
-            boolean lightSquare = ((i / 8) + (i % 8)) % 2 == 0;
-            if (i == selectedSquare) {
-                sq.setFill(Colors.getSquareSelectedColor(lightSquare));
-            } else if (gameState.findMove(selectedSquare, i) != null) {
-                if (mouseSquare == i) sq.setFill(Colors.getSquareHoverColor(lightSquare));
-                else {
-                    if (pieceType == 0) {
-                        sq.setFill(Colors.getSquareBaseColor(lightSquare));
-                        circles[i].setVisible(true);
-                        circles[i].setFill(Colors.getSquareSelectedColor(lightSquare));
-                    } else {
-                        sq.setFill(Colors.getSquareHoverColor(lightSquare));
-                        circles[i].setVisible(true);
-                        circles[i].setFill(Colors.getSquareBaseColor(lightSquare));
-                        circles[i].toBack();
-                        sq.toBack();
-                    }
-                }
-            } else sq.setFill(Colors.getSquareBaseColor(lightSquare));
-
-            ImageView piece = pieces[i];
-            if (pieceType == 0) {
-                piece.setVisible(false);
-                continue;
-            }
-            piece.setVisible(true);
-            piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
-                    new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
-            if (i == selectedSquare && dragging) {
-                piece.setX(mousePose[0] - length / 2);
-                piece.setY(mousePose[1] - length / 2);
-                piece.toFront();
-            }
-        }
     }
 
     public static int getSquare(Scene scene, int x, int y) {
