@@ -244,6 +244,7 @@ public class Main extends Application {
             SoundHandler.playSound("click");
             return;
         }
+        shown = false;
         SoundHandler.playSound(moveHistory.getLast(), gameStateHistory.getLast(), gameState);
         gameStateFuture.add(gameState);
         gameState = gameStateHistory.removeLast();
@@ -331,8 +332,7 @@ public class Main extends Application {
             selectedSquare = square;
             return;
         }
-        SoundHandler.playSound(move, gameState, gameState = gameState.makeMove(move));
-        gameState.computeMoves();
+        makeMove(move);
         firstSelection = true;
         selectedSquare = -1;
     }
@@ -454,13 +454,17 @@ public class Main extends Application {
             selectedSquare = -1;
             return;
         }
+        makeMove(move);
+        selectedSquare = -1;
+    }
+
+    private void makeMove(int[] move) {
         gameStateHistory.add(gameState);
         gameStateFuture.clear();
         moveHistory.add(move);
         gameState = gameState.makeMove(move);
         SoundHandler.playSound(move, gameStateHistory.getLast(), gameState);
         gameState.computeMoves();
-        selectedSquare = -1;
     }
 
     private void onMouseMoved(MouseEvent e) {
