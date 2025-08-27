@@ -68,8 +68,13 @@ public class Main extends Application {
     private boolean shown = false;
     private boolean command = false;
     private boolean shift = false;
+    private static final boolean runAhead = true;
 
     public static void main(String[] args) {
+        if (runAhead) {
+            runBenchmark(false);
+            System.exit(0);
+        }
         launch(args);
         boolean run = askYesWithTimeout("Run benchmark? (y/n) ", 5);
         if (run) {
