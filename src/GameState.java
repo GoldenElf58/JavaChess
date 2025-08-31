@@ -452,6 +452,10 @@ public class GameState {
         return new int[]{moves[moveIdx * 3], moves[moveIdx * 3 + 1], moves[moveIdx * 3 + 2]};
     }
 
+    public GameState makeMove(int moveIdx) {
+        return makeMove(getMove(moveIdx));
+    }
+
     public GameState makeMove(int[] move) {
         int[] newBoard = board.clone();
         boolean whiteQueen = this.whiteQueen;
@@ -651,6 +655,8 @@ public class GameState {
         int blackKnights = 0;
         int whiteBishops = 0;
         for (int piece : board) {
+            if (piece == 0) continue;
+
             if (piece == 6) {
                 hasWhiteKing = true;
                 if (hasBlackKing && !isEmpty) break;
@@ -663,7 +669,7 @@ public class GameState {
                 continue;
             }
 
-            if (piece == 0 || !isEmpty) continue;
+            if (!isEmpty) continue;
 
             otherPieces++;
             if (piece == -2) {

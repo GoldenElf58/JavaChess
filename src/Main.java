@@ -74,7 +74,7 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         if (runAhead) {
-            runBenchmark(false);
+            runBenchmark(true);
             System.exit(0);
         }
         launch(args);
@@ -109,31 +109,42 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug) {
         GameState gameState;
-        Random random = new Random();
-        int N = 10_000;
+        int N = 2;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
-        int moveChoice;
+        Bot bot1 = new Bot(false);
+        Bot bot2 = new Bot(false);
         Watch watch = new Watch();
+        Watch oldWatch = new Watch();
+        Watch newWatch = new Watch();
         watch.start();
         for (int i = 0; i < N; i++) {
             gameState = new GameState();
             gameState.computeMoves();
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
-                moveChoice = random.nextInt(gameState.getMoveCount());
-                gameState = gameState.makeMove(gameState.getMove(moveChoice));
+//                moveChoice = random.nextInt(gameState.getMoveCount());
+                oldWatch.start();
+                int[] move = bot1.getMove(gameState, 4);
+                oldWatch.stop();
+                newWatch.start();
+                bot2.getMove(gameState, 4);
+                newWatch.stop();
+                gameState = gameState.makeMove(move);
                 movesThisGame++;
                 gameState.computeMoves();
                 if (debug) {
                     System.out.println(gameState);
                     gameState.printMoves();
+                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
             perGame[i] = movesThisGame;
             totalHalfMoves += movesThisGame;
         }
         watch.stop();
+        System.out.printf("Old time: %,d ms%n", oldWatch.getElapsedTimeMillis());
+        System.out.printf("New time: %,d ms%n", newWatch.getElapsedTimeMillis());
         System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
@@ -224,7 +235,8 @@ public class Main extends Application {
         switch (e.getCode()) {
             case COMMAND -> command = false;
             case SHIFT -> shift = false;
-            default -> {}
+            default -> {
+            }
         }
     }
 
@@ -244,7 +256,8 @@ public class Main extends Application {
             }
             case COMMAND -> command = true;
             case SHIFT -> shift = true;
-            default -> {}
+            default -> {
+            }
         }
     }
 
@@ -483,7 +496,7 @@ public class Main extends Application {
     private void makeBotMoveAsync() {
         if (!gameState.isInProgress()) return;
         new Thread(() -> {
-            makeMove(bot.getMove(gameState, 100));
+            makeMove(bot.getMove(gameState, .1));
             gameState.computeMoves();
             makeBotMoveAsync();
         }).start();

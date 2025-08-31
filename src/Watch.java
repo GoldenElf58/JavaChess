@@ -1,7 +1,7 @@
 public class Watch {
     private long startTime;
-    private long endTime;
     private boolean running = false;
+    private long totalTime = 0;
 
     public void start() {
         startTime = System.nanoTime();
@@ -9,12 +9,17 @@ public class Watch {
     }
 
     public void stop() {
-        endTime = System.nanoTime();
+        totalTime += System.nanoTime() - startTime;
+        running = false;
+    }
+
+    public void reset() {
+        totalTime = 0;
         running = false;
     }
 
     public long getElapsedTimeNanos() {
-        return running ? System.nanoTime() - startTime : endTime - startTime;
+        return running ? System.nanoTime() - startTime : totalTime;
     }
 
     public long getElapsedTimeMicros() {

@@ -1,5 +1,3 @@
-import static java.lang.Math.abs;
-
 public class PieceSquareTables {
     /**
      * Get the value of a piece on a square
@@ -7,21 +5,20 @@ public class PieceSquareTables {
      * @param piece   Piece as an integer: 0=none, 1=pawn, 2=knight, 3=bishop, 4=rook, 5=queen,
      *                6=king, negative piece for black.
      * @param square  Square of the piece as an integer. Top left is 0, bottom right is 63.
-     * @param isWhite Whether the piece is white.
      * @return The score of the piece in its position.
      */
-    public static int getPieceSquareValue(int piece, int square, boolean isWhite) {
+    public static int getPieceSquareValue(int piece, int square) {
         if (piece == 0) return 0;
-        int[] pieceTable = switch (abs(piece)) {
-            case 1 -> Pawns;
-            case 2 -> Knights;
-            case 3 -> Bishops;
-            case 4 -> Rooks;
-            case 5 -> Queens;
-            case 6 -> KingStart;
+        int[] pieceTable = switch (piece) {
+            case -1, 1 -> Pawns;
+            case -2, 2 -> Knights;
+            case -3, 3 -> Bishops;
+            case -4, 4 -> Rooks;
+            case -5, 5 -> Queens;
+            case -6, 6 -> KingStart;
             default -> throw new IllegalArgumentException("Invalid piece: " + piece);
         };
-        return isWhite ? pieceTable[square] : -pieceTable[63 - square];
+        return piece > 0 ? pieceTable[square] : -pieceTable[63 - square];
     }
 
     public static final int[] Pawns = {
