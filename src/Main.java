@@ -68,7 +68,9 @@ public class Main extends Application {
     private boolean shown = false;
     private boolean command = false;
     private boolean shift = false;
-    private static final boolean runAhead = true;
+    private static final boolean runAhead = false;
+
+    private final Bot bot = new Bot();
 
     public static void main(String[] args) {
         if (runAhead) {
@@ -101,6 +103,7 @@ public class Main extends Application {
             future.cancel(true);
             return false;
         } finally {
+            scanner.close();
             executor.shutdownNow();
         }
     }
@@ -179,6 +182,7 @@ public class Main extends Application {
         stage.show();
 
         gameState.computeMoves();
+        makeBotMoveAsync();
 
         scene.setOnMousePressed(this::onMousePressed);
         scene.setOnMouseDragged(this::onMouseDragged);
@@ -221,6 +225,7 @@ public class Main extends Application {
         switch (e.getCode()) {
             case COMMAND -> command = false;
             case SHIFT -> shift = false;
+            default -> {}
         }
     }
 
@@ -240,7 +245,7 @@ public class Main extends Application {
             }
             case COMMAND -> command = true;
             case SHIFT -> shift = true;
-            default -> System.out.println(e.getCode());
+            default -> {}
         }
     }
 
@@ -338,6 +343,8 @@ public class Main extends Application {
             return;
         }
         makeMove(move);
+//        makeBotMoveAsync();
+//        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
         firstSelection = true;
         selectedSquare = -1;
     }
@@ -460,6 +467,8 @@ public class Main extends Application {
             return;
         }
         makeMove(move);
+//        makeBotMoveAsync();
+//        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
         selectedSquare = -1;
     }
 
@@ -470,6 +479,15 @@ public class Main extends Application {
         gameState = gameState.makeMove(move);
         SoundHandler.playSound(move, gameStateHistory.getLast(), gameState);
         gameState.computeMoves();
+    }
+
+    private void makeBotMoveAsync() {
+        if (!gameState.isInProgress()) return;
+        new Thread(() -> {
+            makeMove(bot.getMove(gameState, 100));
+            gameState.computeMoves();
+            makeBotMoveAsync();
+        }).start();
     }
 
     private void onMouseMoved(MouseEvent e) {

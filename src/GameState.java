@@ -1,3 +1,4 @@
+import java.util.Arrays;
 import java.util.HashMap;
 
 import static java.lang.Math.abs;
@@ -15,16 +16,16 @@ public class GameState {
             4, 2, 3, 5, 6, 3, 2, 4
     };
     private final int[] board;
-    private final boolean whiteQueen;
-    private final boolean whiteKing;
-    private final boolean blackQueen;
-    private final boolean blackKing;
+    public final boolean whiteQueen;
+    public final boolean whiteKing;
+    public final boolean blackQueen;
+    public final boolean blackKing;
     private final int[] lastMove;
     private final int halfMoves;
     private final int halfMoveClock;
     private final boolean whiteMove;
     private final int color;
-    private final HashMap<int[], Integer> previousPositionCount;
+    private final HashMap<Integer, Integer> previousPositionCount;
     private int[] moves = new int[654]; // 218 * 3
     private int moveCount = 0;
     private boolean movesGenerated = false;
@@ -49,7 +50,7 @@ public class GameState {
 
     GameState(int[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
               boolean blackKing, int[] lastMove, int halfMoves, int halfMoveClock,
-              boolean whiteMove, HashMap<int[], Integer> previousPositionCount, boolean isWinner,
+              boolean whiteMove, HashMap<Integer, Integer> previousPositionCount, boolean isWinner,
               int winner) {
         this.board = board;
         this.whiteQueen = whiteQueen;
@@ -541,9 +542,10 @@ public class GameState {
         int halfMoveClock = piece == 1 ? 0 : (captured == 0 ? this.halfMoveClock + 1 : 0);
 
         if (halfMoveClock > 0) {
-            HashMap<int[], Integer> previousPositionCount = new HashMap<>(this.previousPositionCount);
-            int positionCount = previousPositionCount.getOrDefault(this.board, 0) + 1;
-            previousPositionCount.put(this.board, positionCount);
+            HashMap<Integer, Integer> previousPositionCount = new HashMap<>(this.previousPositionCount);
+            int boardHash = Arrays.hashCode(board);
+            int positionCount = previousPositionCount.getOrDefault(boardHash, 0) + 1;
+            previousPositionCount.put(boardHash, positionCount);
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock,
                     !whiteMove, previousPositionCount, positionCount >= 3, 0);
