@@ -684,6 +684,7 @@ public class GameState {
                 }
             } else if (otherPieces >= 3) {
                 isEmpty = false;
+                if (hasBlackKing && hasWhiteKing) break;
             }
         }
         if (hasWhiteKing && !hasBlackKing) winner = 1;

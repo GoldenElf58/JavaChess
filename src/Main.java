@@ -70,7 +70,7 @@ public class Main extends Application {
     private boolean shift = false;
     private static final boolean runAhead = false;
 
-    private final Bot bot = new Bot(false);
+    private final Bot bot = new Bot(true);
 
     public static void main(String[] args) {
         if (runAhead) {

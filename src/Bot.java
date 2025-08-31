@@ -95,8 +95,9 @@ public class Bot {
 
     private int minimaxScore(GameState state, int depth, boolean isMaximizing, int alpha,
                              int beta) {
+        if (depth == 0) return evaluate(state);
         state.computeMoves();
-        if (depth == 0 || !state.isInProgress()) return evaluate(state);
+        if (!state.isInProgress()) return evaluate(state);
         if (moveCache.containsKey(hashCode(state, depth)))
             return moveCache.get(hashCode(state, depth));
 
