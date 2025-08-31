@@ -1,3 +1,4 @@
+import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -8,6 +9,11 @@ public class Bot {
 
     private int score;
     private final HashMap<Integer, Integer> moveCache = new HashMap<>();
+    private final boolean log;
+
+    public Bot(boolean log) {
+        this.log = log;
+    }
 
     private int evaluate(GameState state) {
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE;
@@ -28,7 +34,8 @@ public class Bot {
         watch.start();
         final int[] depth = {1};
         final int[][] move = {{0, 0, 0}};
-        Thread thread = new Thread(() -> {});
+        Thread thread = new Thread(() -> {
+        });
         score = 0;
         while (watch.getElapsedTimeMillis() < allottedTime) {
             if (!thread.isAlive()) {
@@ -41,6 +48,22 @@ public class Bot {
             }
         }
         thread.interrupt();
+        if (log) {
+            if (!new File("depths.txt").exists()) {
+                System.out.println("Creating file depths.txt");
+                try {
+                    if (!new File("depths.txt").createNewFile())
+                        System.out.println("Failed to create file depths.txt");
+                } catch (IOException e) {
+                    System.out.println("Failed to create file depths.txt");
+                }
+            }
+            try (PrintWriter writer = new PrintWriter(new FileWriter("depths.txt", true))) {
+                writer.println(depth[0]);
+            } catch (IOException e) {
+                System.out.println("Failed to append to file depths.txt");
+            }
+        }
         System.out.println("Depth: " + depth[0]);
         System.out.println("Score: " + score);
         return move[0];

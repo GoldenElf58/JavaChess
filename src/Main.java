@@ -70,7 +70,7 @@ public class Main extends Application {
     private boolean shift = false;
     private static final boolean runAhead = false;
 
-    private final Bot bot = new Bot();
+    private final Bot bot = new Bot(false);
 
     public static void main(String[] args) {
         if (runAhead) {
@@ -91,7 +91,7 @@ public class Main extends Application {
         Scanner scanner = new Scanner(System.in);
         Future<String> future = executor.submit(scanner::nextLine);
 
-        try {
+        try (scanner) {
             System.out.print(prompt);
             String input = future.get(seconds, TimeUnit.SECONDS);
             return input != null && input.equalsIgnoreCase("y");
@@ -103,7 +103,6 @@ public class Main extends Application {
             future.cancel(true);
             return false;
         } finally {
-            scanner.close();
             executor.shutdownNow();
         }
     }
