@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import static java.lang.Math.floorDiv;
+import static java.lang.Math.round;
 
 public class Main extends Application {
 
@@ -68,7 +69,7 @@ public class Main extends Application {
     private boolean shown = false;
     private boolean command = false;
     private boolean shift = false;
-    private static final boolean runAhead = false;
+    private static final boolean runAhead = true;
 
     private final Bot bot = new Bot(true);
 
@@ -108,61 +109,120 @@ public class Main extends Application {
     }
 
     private static void runBenchmark(boolean debug) {
+        runBenchmark(debug, false);
+    }
+
+    private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 2;
+        int N = 30000;
+        int warmup = 500;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
+        long[] oldTimes = new long[N];
+        long[] newTimes = new long[N];
         Bot bot1 = new Bot(false);
         Bot bot2 = new Bot(false);
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
         watch.start();
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < N + warmup; i++) {
             gameState = new GameState();
             gameState.computeMoves();
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
 //                moveChoice = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
-                int[] move = bot1.getMove(gameState, 4);
+                int[] move = bot1.getMove(gameState, 1);
                 oldWatch.stop();
                 newWatch.start();
-                bot2.getMove(gameState, 4);
+//                bot2.getMoveNew(gameState, 4);
                 newWatch.stop();
                 gameState = gameState.makeMove(move);
                 movesThisGame++;
                 gameState.computeMoves();
                 if (debug) {
-                    System.out.println(gameState);
-                    gameState.printMoves();
-                    System.out.printf("Half moves: %,d%n", movesThisGame);
+                    if (verbose) {
+                        System.out.println(gameState);
+                        gameState.printMoves();
+                    }
+//                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
-            perGame[i] = movesThisGame;
-            totalHalfMoves += movesThisGame;
+            if ((double) i / (N + warmup) * 100 % 1 == 0)
+                System.out.printf("Progress: %.0f%%%n", (double) i / (N + warmup) * 100);
+            bot1.clearCache();
+            bot2.clearCache();
+            if (i >= warmup) {
+                oldTimes[i - warmup] = oldWatch.getElapsedTimeNanos();
+                newTimes[i - warmup] = newWatch.getElapsedTimeNanos();
+                perGame[i - warmup] = movesThisGame;
+                totalHalfMoves += movesThisGame;
+            }
+            oldWatch.reset();
+            newWatch.reset();
         }
         watch.stop();
-        System.out.printf("Old time: %,d ms%n", oldWatch.getElapsedTimeMillis());
-        System.out.printf("New time: %,d ms%n", newWatch.getElapsedTimeMillis());
+        System.out.println("\n");
+//        System.out.printf("Old time: %,d ms%n", oldWatch.getElapsedTimeMillis());
+//        System.out.printf("New time: %,d ms%n", newWatch.getElapsedTimeMillis());
+        System.out.println("Old times: " + Arrays.toString(oldTimes));
+        System.out.println("New times: " + Arrays.toString(newTimes));
+        System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
+        System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
+        System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
+        System.out.printf("New time Standard Deviation: %s%n", time(round(stdDev(newTimes))));
+        double[] ciOld = ci(oldTimes);
+        double[] ciNew = ci(newTimes);
+        System.out.printf("Old time 95%% CI: (%s, %s)%n", time(round(ciOld[0])), time(round(ciOld[1])));
+        System.out.printf("New time 95%% CI: (%s, %s)%n", time(round(ciNew[0])), time(round(ciNew[1])));
         System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
         System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
 
         double mean = totalHalfMoves / (double) N;
+        double[] ci = ci(perGame);
+
+        System.out.printf("Average half-moves/game: %.2f%n", mean);
+        System.out.printf("95%% CI (half-moves/game): (%.2f, %.2f)%n", ci[0], ci[1]);
+    }
+
+    public static String time(long time, int precision) {
+        String fmt = "%,." + precision + "g";
+        if (time < 1_000) {
+            return String.format("%s ns", String.format(fmt, (double) time));
+        }
+        if (time < 1_000_000) {
+            return String.format("%s µs", String.format(fmt, time / 1_000.0));
+        }
+        if (time < 1_000_000_000) {
+            return String.format("%s ms", String.format(fmt, time / 1_000_000.0));
+        }
+        return String.format("%s s", String.format(fmt, time / 1_000_000_000.0));
+    }
+
+    public static String time(long time) {
+        return time(time, 5);
+    }
+
+    public static double[] ci(long[] data) {
+        double mean = Arrays.stream(data).average().orElse(0.0);
+        double sd = stdDev(data);
+        double margin = 1.96 * sd / Math.sqrt(data.length);
+        double ciLower = mean - margin;
+        double ciUpper = mean + margin;
+        return new double[] {ciLower, ciUpper};
+    }
+
+    public static double stdDev(long[] data) {
+        double mean = Arrays.stream(data).average().orElse(0.0);
         double sumSq = 0.0;
-        for (long v : perGame) {
+        for (long v : data) {
             double d = v - mean;
             sumSq += d * d;
         }
-        double sd = Math.sqrt(sumSq / (N - 1));
-        double margin = 1.96 * sd / Math.sqrt(N);
-        double ciLower = mean - margin;
-        double ciUpper = mean + margin;
-
-        System.out.printf("Average half-moves/game: %.2f%n", mean);
-        System.out.printf("95%% CI (half-moves/game): (%.2f, %.2f)%n", ciLower, ciUpper);
+        return Math.sqrt(sumSq / (data.length - 1));
     }
 
     @Override
@@ -355,7 +415,7 @@ public class Main extends Application {
             return;
         }
         makeMove(move);
-//        makeBotMoveAsync();
+        makeBotMoveAsync();
 //        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
         firstSelection = true;
         selectedSquare = -1;
@@ -479,7 +539,7 @@ public class Main extends Application {
             return;
         }
         makeMove(move);
-//        makeBotMoveAsync();
+        makeBotMoveAsync();
 //        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
         selectedSquare = -1;
     }
@@ -496,7 +556,7 @@ public class Main extends Application {
     private void makeBotMoveAsync() {
         if (!gameState.isInProgress()) return;
         new Thread(() -> {
-            makeMove(bot.getMove(gameState, .1));
+            makeMove(bot.getMove(gameState, 5.0));
             gameState.computeMoves();
             makeBotMoveAsync();
         }).start();

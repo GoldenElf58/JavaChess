@@ -31,6 +31,8 @@ public class GameState {
     private boolean movesGenerated = false;
     private boolean isWinner;
     private int winner;
+    private final boolean extraPosition;
+    private final int myHash;
 
     GameState() {
         board = startBoard;
@@ -46,12 +48,14 @@ public class GameState {
         previousPositionCount = new HashMap<>();
         isWinner = false;
         winner = 0;
+        extraPosition = true;
+        myHash = Arrays.hashCode(board);
     }
 
     GameState(int[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
               boolean blackKing, int[] lastMove, int halfMoves, int halfMoveClock,
               boolean whiteMove, HashMap<Integer, Integer> previousPositionCount, boolean isWinner,
-              int winner) {
+              int winner, boolean extraPosition, int hashKey) {
         this.board = board;
         this.whiteQueen = whiteQueen;
         this.whiteKing = whiteKing;
@@ -63,6 +67,8 @@ public class GameState {
         this.whiteMove = whiteMove;
         this.color = whiteMove ? 1 : -1;
         this.previousPositionCount = previousPositionCount;
+        this.extraPosition = extraPosition;
+        this.myHash = hashKey;
         this.isWinner = isWinner;
         this.winner = winner;
     }
@@ -477,8 +483,8 @@ public class GameState {
                 blackKing = false;
             }
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    null, halfMoves + 1, halfMoveClock + 1,
-                    !whiteMove, new HashMap<>(), false, 0);
+                    null, halfMoves + 1, halfMoveClock + 1, !whiteMove, new HashMap<>(), false, 0,
+                    false, 0);
         }
 
         // Promotion
@@ -486,8 +492,7 @@ public class GameState {
             newBoard[move[1] - 8 * color] = move[2];
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    null, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>(), false, 0);
+                    null, halfMoves + 1, 0, !whiteMove, new HashMap<>(), false, 0, false, 0);
         }
 
         // En Passant
@@ -496,8 +501,7 @@ public class GameState {
             newBoard[move[1] + move[2]] = 0;
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    null, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>(), false, 0);
+                    null, halfMoves + 1, 0, !whiteMove, new HashMap<>(), false, 0, false, 0);
         }
 
         // Promotion Taking
@@ -505,8 +509,7 @@ public class GameState {
             newBoard[move[2]] = (-2 - move[0]) * color;
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    null, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>(), false, 0);
+                    null, halfMoves + 1, 0, !whiteMove, new HashMap<>(), false, 0, false, 0);
         }
 
         int piece = newBoard[move[0]];
@@ -540,24 +543,27 @@ public class GameState {
         if ((piece == 1 || piece == -1) && abs(move[0] - move[1]) == 16) {
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     move, halfMoves + 1, 0,
-                    !whiteMove, new HashMap<>(), false, 0);
+                    !whiteMove, new HashMap<>(), false, 0, false, 0);
         }
 
-        int halfMoveClock = piece == 1 ? 0 : (captured == 0 ? this.halfMoveClock + 1 : 0);
+        int halfMoveClock = piece == 1 && captured != 0 ? 0 : this.halfMoveClock + 1;
 
         if (halfMoveClock > 0) {
-            HashMap<Integer, Integer> previousPositionCount = new HashMap<>(this.previousPositionCount);
             int boardHash = Arrays.hashCode(board);
-            int positionCount = previousPositionCount.getOrDefault(boardHash, 0) + 1;
-            previousPositionCount.put(boardHash, positionCount);
+            int positionCount = this.previousPositionCount.getOrDefault(boardHash, 0) + 1;
+            HashMap<Integer, Integer> previousPositionCount = this.previousPositionCount;
+            if (extraPosition) {
+                previousPositionCount = new HashMap<>(this.previousPositionCount);
+                previousPositionCount.put(myHash, previousPositionCount.getOrDefault(myHash, 0) + 1);
+                previousPositionCount.put(boardHash, positionCount);
+            }
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock,
-                    !whiteMove, previousPositionCount, positionCount >= 3, 0);
+                    !whiteMove, previousPositionCount, positionCount >= 3, 0, !extraPosition, boardHash);
         }
 
         return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                null, halfMoves + 1, 0,
-                !whiteMove, new HashMap<>(), false, 0);
+                null, halfMoves + 1, 0, !whiteMove, new HashMap<>(), false, 0, false, 0);
     }
 
     private int makeMoveOnlyBoard(int[] move) {
@@ -647,9 +653,7 @@ public class GameState {
             winner = inCheck() ? -color : 0;
             return false;
         }
-        boolean hasWhiteKing = false;
-        boolean hasBlackKing = false;
-        boolean isEmpty = true;
+        isWinner = true;
         int otherPieces = 0;
         int whiteKnights = 0;
         int blackKnights = 0;
@@ -657,47 +661,26 @@ public class GameState {
         for (int piece : board) {
             if (piece == 0) continue;
 
-            if (piece == 6) {
-                hasWhiteKing = true;
-                if (hasBlackKing && !isEmpty) break;
-                continue;
-            }
-
-            if (piece == -6) {
-                hasBlackKing = true;
-                if (hasWhiteKing && !isEmpty) break;
-                continue;
-            }
-
-            if (!isEmpty) continue;
-
             otherPieces++;
-            if (piece == -2) {
-                blackKnights++;
-            } else if (piece == 2) {
-                whiteKnights++;
-            } else if (piece == 3) {
-                whiteBishops++;
-            } else if (piece != -3) {
-                isEmpty = false;
-                if (hasBlackKing && hasWhiteKing) break;
-                continue;
+            if (piece == -2) blackKnights++;
+            else if (piece == 2) whiteKnights++;
+            else if (piece == 3) whiteBishops++;
+            else if (piece != -3) {
+                isWinner = false;
+                return true;
             }
             if (otherPieces == 2) {
                 if (!(whiteKnights + blackKnights == 2 || (whiteBishops + whiteKnights == 1))) {
-                    isEmpty = false;
-                    if (hasBlackKing && hasWhiteKing) break;
+                    isWinner = false;
+                    return true;
                 }
             } else if (otherPieces >= 3) {
-                isEmpty = false;
-                if (hasBlackKing && hasWhiteKing) break;
+                isWinner = false;
+                return true;
             }
         }
-        if (hasWhiteKing && !hasBlackKing) winner = 1;
-        else if (!hasWhiteKing && hasBlackKing) winner = -1;
-        else if (isEmpty) winner = 0;
-        isWinner = !hasWhiteKing || !hasBlackKing || isEmpty;
-        return !isWinner;
+        winner = 0;
+        return false;
     }
 
     public int getWinner() {
