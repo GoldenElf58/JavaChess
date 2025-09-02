@@ -257,9 +257,8 @@ public class GameState {
             int target = pieceIdx + dir * j;
             if (!((target & 7) == pieceMod8 + dir * j && target / 8 == pieceDiv8))
                 break;
-            if (target == targetIdx)
-                return true;
-            if (target < 0 || target > 63 || board[target] != 0) break;
+            if (target == targetIdx) return true;
+            if (board[target] != 0) break;
         }
         return false;
     }
@@ -361,7 +360,7 @@ public class GameState {
                     break;
                 if (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)
                     return true;
-                if (target < 0 || target > 63 || board[target] != 0) break;
+                if (board[target] != 0) break;
             }
         }
         for (int d2 = -1; d2 <= 1; d2 += 2) {

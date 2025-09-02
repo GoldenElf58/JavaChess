@@ -121,8 +121,8 @@ public class Bot {
         if (sortMoves) {
             for (int i = 0; i < state.getMoveCount(); i++) moveSearchOrder[i] = i;
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.get(depth - 2).get(zobristHash(state.makeMove(m1)))
-                            - moveCache.get(depth - 2).get(zobristHash(state.makeMove(m2)))));
+                    (moveCache.get(depth - 2).getOrDefault(zobristHash(state.makeMove(m1)), 0)
+                            - moveCache.get(depth - 2).getOrDefault(zobristHash(state.makeMove(m2)), 0)));
         }
 
         for (int i = 0; i < state.getMoveCount(); i++) {
@@ -189,8 +189,8 @@ public class Bot {
         if (sortMoves) {
             for (int i = 0; i < state.getMoveCount(); i++) moveSearchOrder[i] = i;
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.get(depth - 2).get(zobristHash(state.makeMove(m1)))
-                            - moveCache.get(depth - 2).get(zobristHash(state.makeMove(m2)))));
+                    (moveCache.get(depth - 2).getOrDefault(zobristHash(state.makeMove(m1)), 0)
+                            - moveCache.get(depth - 2).getOrDefault(zobristHash(state.makeMove(m2)), 0)));
         }
 
         for (int i = 0; i < state.getMoveCount(); i++) {
