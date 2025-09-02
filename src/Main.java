@@ -114,8 +114,8 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 7;
-        int warmup = 3;
+        int N = 15;
+        int warmup = 5;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
@@ -136,7 +136,7 @@ public class Main extends Application {
                 int[] move = bot1.getMove(gameState, 4);
                 oldWatch.stop();
                 newWatch.start();
-                bot2.getMoveNew(gameState, 4);
+//                bot2.getMoveNew(gameState, 4);
                 newWatch.stop();
                 gameState = gameState.makeMove(move);
                 movesThisGame++;
@@ -558,7 +558,7 @@ public class Main extends Application {
         new Thread(() -> {
             makeMove(bot.getMove(gameState, 5.0));
             gameState.computeMoves();
-            makeBotMoveAsync();
+//            makeBotMoveAsync();
         }).start();
     }
 
