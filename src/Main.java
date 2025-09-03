@@ -114,14 +114,15 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 15;
-        int warmup = 5;
+        int N = 10000;
+        int warmup = 1000;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
         Bot bot1 = new Bot(false);
         Bot bot2 = new Bot(false);
+        Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
@@ -131,13 +132,13 @@ public class Main extends Application {
             gameState.computeMoves();
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
-//                moveChoice = random.nextInt(gameState.getMoveCount());
-                oldWatch.start();
-                int[] move = bot1.getMove(gameState, 4);
-                oldWatch.stop();
-                newWatch.start();
+                int move = random.nextInt(gameState.getMoveCount());
+//                oldWatch.start();
+//                int move = bot1.getMove(gameState, 1);
+//                oldWatch.stop();
+//                newWatch.start();
 //                bot2.getMoveNew(gameState, 4);
-                newWatch.stop();
+//                newWatch.stop();
                 gameState = gameState.makeMove(move);
                 movesThisGame++;
                 gameState.computeMoves();
@@ -149,7 +150,7 @@ public class Main extends Application {
 //                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
-            if ((int) (((double) (i) / (N + warmup)) * 100 % 1) == 0)
+            if ((((double) (i) / (N + warmup)) * 100 % 5) == 0)
                 System.out.printf("Progress: %.0f%%%n", (double) (i + 1) / (N + warmup) * 100);
             bot1.clearCache();
             bot2.clearCache();
@@ -542,6 +543,10 @@ public class Main extends Application {
         makeBotMoveAsync();
 //        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
         selectedSquare = -1;
+    }
+
+    private void makeMove(int moveIdx) {
+        makeMove(gameState.getMove(moveIdx));
     }
 
     private void makeMove(int[] move) {
