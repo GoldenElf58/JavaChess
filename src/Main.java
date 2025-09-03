@@ -122,7 +122,7 @@ public class Main extends Application {
         long[] newTimes = new long[N];
         Bot bot1 = new Bot(false);
         Bot bot2 = new Bot(false);
-        Random random = new Random();
+//        Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
@@ -132,13 +132,13 @@ public class Main extends Application {
             gameState.computeMoves();
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
-                int move = random.nextInt(gameState.getMoveCount());
-//                oldWatch.start();
-//                int move = bot1.getMove(gameState, 1);
-//                oldWatch.stop();
-//                newWatch.start();
-//                bot2.getMoveNew(gameState, 4);
-//                newWatch.stop();
+//                int move = random.nextInt(gameState.getMoveCount());
+                oldWatch.start();
+                int move = bot1.getMove(gameState, 1);
+                oldWatch.stop();
+                newWatch.start();
+                bot2.getMoveNew(gameState, 4);
+                newWatch.stop();
                 gameState = gameState.makeMove(move);
                 movesThisGame++;
                 gameState.computeMoves();
@@ -150,7 +150,7 @@ public class Main extends Application {
 //                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
-            if ((((double) (i) / (N + warmup)) * 100 % 5) == 0)
+            if ((((double) (i + 1) / (N + warmup)) * 100 % 5) == 0)
                 System.out.printf("Progress: %.0f%%%n", (double) (i + 1) / (N + warmup) * 100);
             bot1.clearCache();
             bot2.clearCache();
@@ -165,10 +165,6 @@ public class Main extends Application {
         }
         watch.stop();
         System.out.println("\n");
-//        System.out.printf("Old time: %,d ms%n", oldWatch.getElapsedTimeMillis());
-//        System.out.printf("New time: %,d ms%n", newWatch.getElapsedTimeMillis());
-//        System.out.println("Old times: " + Arrays.toString(oldTimes));
-//        System.out.println("New times: " + Arrays.toString(newTimes));
         System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
         System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
@@ -179,8 +175,8 @@ public class Main extends Application {
         System.out.printf("New time 95%% CI: (%s, %s)%n", time(round(ciNew[0])), time(round(ciNew[1])));
         System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
-        System.out.printf("Time: %,d ms%n", watch.getElapsedTimeMillis());
-        System.out.printf("Average time: %,d ns%n", watch.getElapsedTimeNanos() / totalHalfMoves);
+        System.out.printf("Time: %s%n", time(watch.getElapsedTimeNanos()));
+        System.out.printf("Average time: %s%n", time(watch.getElapsedTimeNanos() / totalHalfMoves));
 
         double mean = totalHalfMoves / (double) N;
         double[] ci = confidenceInterval95(perGame);
