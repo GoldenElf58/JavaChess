@@ -75,14 +75,16 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         if (runAhead) {
-            runBenchmark(true);
+            runBenchmark();
             System.exit(0);
         }
         launch(args);
         boolean run = askYesWithTimeout("Run benchmark? (y/n) ", 5);
         if (run) {
             boolean debug = askYesWithTimeout("Debug mode? (y/n) ", 3);
-            runBenchmark(debug);
+            boolean verbose = false;
+            if (debug) verbose = askYesWithTimeout("Verbose debug mode? (y/n) ", 3);
+            runBenchmark(debug, verbose);
         }
         System.exit(0);
     }
@@ -108,8 +110,8 @@ public class Main extends Application {
         }
     }
 
-    private static void runBenchmark(boolean debug) {
-        runBenchmark(debug, false);
+    private static void runBenchmark() {
+        runBenchmark(true, false);
     }
 
     private static void runBenchmark(boolean debug, boolean verbose) {
