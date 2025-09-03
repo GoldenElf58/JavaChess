@@ -30,7 +30,6 @@ public class GameState {
     private boolean movesGenerated = false;
     private boolean isWinner;
     private int winner;
-    private final boolean extraPosition;
 
     GameState() {
         board = startBoard;
@@ -46,13 +45,12 @@ public class GameState {
         positionHistory = new PositionHistory(Arrays.hashCode(board));
         isWinner = false;
         winner = 0;
-        extraPosition = true;
     }
 
     GameState(int[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
               boolean blackKing, int[] lastMove, int halfMoves, int halfMoveClock,
               boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
-              int winner, boolean extraPosition) {
+              int winner) {
         this.board = board;
         this.whiteQueen = whiteQueen;
         this.whiteKing = whiteKing;
@@ -64,7 +62,6 @@ public class GameState {
         this.whiteMove = whiteMove;
         this.color = whiteMove ? 1 : -1;
         this.positionHistory = positionHistory;
-        this.extraPosition = extraPosition;
         this.isWinner = isWinner;
         this.winner = winner;
     }
@@ -479,7 +476,7 @@ public class GameState {
             }
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock + 1, !whiteMove,
-                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0, false);
+                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0);
         }
 
         // Promotion
@@ -488,7 +485,7 @@ public class GameState {
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, 0, !whiteMove,
-                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0, false);
+                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0);
         }
 
         // En Passant
@@ -498,7 +495,7 @@ public class GameState {
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock + 1, !whiteMove,
-                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0, false);
+                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0);
         }
 
         // Promotion Taking
@@ -507,7 +504,7 @@ public class GameState {
             newBoard[move[1]] = 0;
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock + 1, !whiteMove,
-                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0, false);
+                    new PositionHistory(Arrays.hashCode(newBoard)), false, 0);
         }
 
         int piece = newBoard[move[0]];
@@ -541,22 +538,22 @@ public class GameState {
         if ((piece == 1 || piece == -1) && abs(move[0] - move[1]) == 16) {
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     move, halfMoves + 1, 0,
-                    !whiteMove, new PositionHistory(Arrays.hashCode(newBoard)), false, 0, false);
+                    !whiteMove, new PositionHistory(Arrays.hashCode(newBoard)), false, 0);
         }
 
-        int halfMoveClock = piece == 1 && captured != 0 ? 0 : this.halfMoveClock + 1;
+        int halfMoveClock = piece == 1 || captured != 0 ? 0 : this.halfMoveClock + 1;
 
         if (halfMoveClock > 0) {
             int boardHash = Arrays.hashCode(newBoard);
             PositionHistory positionHistory = new PositionHistory(boardHash, this.positionHistory);
             return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     null, halfMoves + 1, halfMoveClock,
-                    !whiteMove, positionHistory, positionHistory.count >= 3, 0, !extraPosition);
+                    !whiteMove, positionHistory, positionHistory.count >= 3, 0);
         }
 
         return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                 null, halfMoves + 1, 0, !whiteMove, new PositionHistory(Arrays.hashCode(newBoard)),
-                false, 0, false);
+                false, 0);
     }
 
     private int makeMoveOnlyBoard(int[] move) {
@@ -652,28 +649,31 @@ public class GameState {
         int blackKnights = 0;
         int whiteBishops = 0;
         for (int piece : board) {
-            if (piece == 0) continue;
+            if (piece == 0 || piece == -6 || piece == 6) continue;
 
             otherPieces++;
-            if (piece == -2) blackKnights++;
-            else if (piece == 2) whiteKnights++;
-            else if (piece == 3) whiteBishops++;
-            else if (piece != -3) {
+            if (piece == -2) {
+                blackKnights++;
+            } else if (piece == 2) {
+                whiteKnights++;
+            } else if (piece == 3) {
+                whiteBishops++;
+            } else if (piece != -3) {
                 isWinner = false;
-                return true;
+                break;
             }
             if (otherPieces == 2) {
                 if (!(whiteKnights + blackKnights == 2 || (whiteBishops + whiteKnights == 1))) {
                     isWinner = false;
-                    return true;
+                    break;
                 }
             } else if (otherPieces >= 3) {
                 isWinner = false;
-                return true;
+                break;
             }
         }
-        winner = 0;
-        return false;
+        if (isWinner) winner = 0;
+        return !isWinner;
     }
 
     public int getWinner() {
