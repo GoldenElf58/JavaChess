@@ -116,8 +116,8 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 3000;
-        int warmup = 300;
+        int N = 10000;
+        int warmup = 1000;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
@@ -136,10 +136,10 @@ public class Main extends Application {
             while (gameState.isInProgress()) {
                 int move = random.nextInt(gameState.getMoveCount());
 //                oldWatch.start();
-//                int move = bot1.getMove(gameState, 1);
+//                int move = bot1.getMove(gameState, 3);
 //                oldWatch.stop();
 //                newWatch.start();
-//                bot2.getMoveNew(gameState, 4);
+//                bot2.getMoveNew(gameState, 3);
 //                newWatch.stop();
                 gameState = gameState.makeMove(move);
                 movesThisGame++;

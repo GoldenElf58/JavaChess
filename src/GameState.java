@@ -25,7 +25,7 @@ public class GameState {
     private final boolean whiteMove;
     private final int color;
     private final PositionHistory positionHistory;
-    private int[] moves = new int[654]; // 218 * 3
+    private int[] moves;
     private int moveCount = 0;
     private boolean movesGenerated = false;
     private boolean isWinner;
@@ -401,6 +401,7 @@ public class GameState {
     }
 
     public void computeMovesPseudoLegal() {
+        if (moves == null) moves = new int[654]; // 218 * 3
         moveCount = 0;
         int pieceType;
         for (int i = 0; i < 64; i++) {
