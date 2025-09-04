@@ -116,28 +116,27 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 10000;
-        int warmup = 1000;
+        int N = 15;
+        int warmup = 5;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
         Bot bot1 = new Bot(false);
         Bot bot2 = new Bot(false);
-        Random random = new Random();
+//        Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
-        watch.start();
         for (int i = 0; i < N + warmup; i++) {
             gameState = new GameState();
             gameState.computeMoves();
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
-                int move = random.nextInt(gameState.getMoveCount());
-//                oldWatch.start();
-//                int move = bot1.getMove(gameState, 3);
-//                oldWatch.stop();
+//                int move = random.nextInt(gameState.getMoveCount());
+                oldWatch.start();
+                int move = bot1.getMove(gameState, 4);
+                oldWatch.stop();
 //                newWatch.start();
 //                bot2.getMoveNew(gameState, 3);
 //                newWatch.stop();
@@ -156,6 +155,7 @@ public class Main extends Application {
                 System.out.printf("Progress: %.0f%%%n", (double) (i + 1) / (N + warmup) * 100);
             bot1.clearCache();
             bot2.clearCache();
+            if (i + 1 == warmup) watch.start();
             if (i >= warmup) {
                 oldTimes[i - warmup] = oldWatch.getElapsedTimeNanos();
                 newTimes[i - warmup] = newWatch.getElapsedTimeNanos();
@@ -178,7 +178,10 @@ public class Main extends Application {
         System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %s%n", time(watch.getElapsedTimeNanos()));
-        System.out.printf("Average time: %s%n", time(watch.getElapsedTimeNanos() / totalHalfMoves));
+        System.out.printf("Average time per half-move: %s%n",
+                time(watch.getElapsedTimeNanos() / totalHalfMoves));
+        System.out.printf("Average time per game: %s%n",
+                time(watch.getElapsedTimeNanos() / N));
 
         double mean = totalHalfMoves / (double) N;
         double[] ci = confidenceInterval95(perGame);
