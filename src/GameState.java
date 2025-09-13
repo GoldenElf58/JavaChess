@@ -130,16 +130,17 @@ public class GameState {
                 }
             } else {
                 kingMoved = move[0] >= 0 && move[2] == 6;
+                if (inCheck && !kingMoved) illegal = true;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
-                for (int i = 0; i < 64; i++) {
+                for (int i = 0; i < 64 && !illegal; i++) {
                     switch (board[i] * color) { // make board local
                         case 0:
                             break;
                         case -1:
-                            if (kingMoved || inCheck) illegal = isPawnAttacking(i, kingIdx);
+                            if (kingMoved) illegal = isPawnAttacking(i, kingIdx);
                             break;
                         case -2:
-                            if (kingMoved || inCheck) illegal = isKnightAttacking(i, kingIdx);
+                            if (kingMoved) illegal = isKnightAttacking(i, kingIdx);
                             break;
                         case -3:
                             illegal = isBishopAttacking(i, kingIdx);
@@ -151,10 +152,9 @@ public class GameState {
                             illegal = isQueenAttacking(i, kingIdx);
                             break;
                         case -6:
-                            if (kingMoved || inCheck) illegal = isKingAttacking(i, kingIdx);
+                            if (kingMoved) illegal = isKingAttacking(i, kingIdx);
                             break;
                     }
-                    if (illegal) break;
                 }
             }
             undoMoveOnlyBoard(move, pieceTaken);
