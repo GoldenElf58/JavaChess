@@ -70,6 +70,10 @@ public class Main extends Application {
     private boolean command = false;
     private boolean shift = false;
     private static final boolean runBenchmarkOnly = false;
+    private static final boolean whitePlayerHuman = false;
+    private static final boolean blackPlayerHuman = true;
+    private static final double allottedTime = 1.0;
+    private volatile boolean appOpen = true;
 
     private final Bot bot = new Bot(true);
 
@@ -254,7 +258,7 @@ public class Main extends Application {
         stage.show();
 
         gameState.computeMoves();
-//        makeBotMoveAsync();
+        if (!whitePlayerHuman) makeBotMoveAsync();
 
         scene.setOnMousePressed(this::onMousePressed);
         scene.setOnMouseDragged(this::onMouseDragged);
@@ -262,6 +266,7 @@ public class Main extends Application {
         scene.setOnMouseMoved(this::onMouseMoved);
         scene.setOnKeyPressed(this::onKeyPressed);
         scene.setOnKeyReleased(this::onKeyReleased);
+        stage.setOnCloseRequest((_) -> appOpen = false);
 
         scene.widthProperty().addListener(_ -> updatePositions());
         scene.heightProperty().addListener(_ -> updatePositions());
@@ -417,8 +422,8 @@ public class Main extends Application {
             return;
         }
         makeMove(move);
-        makeBotMoveAsync();
-//        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
+        if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
+            makeBotMoveAsync();
         firstSelection = true;
         selectedSquare = -1;
     }
@@ -515,6 +520,7 @@ public class Main extends Application {
             return;
         }
         if (e.getButton() != MouseButton.PRIMARY) return;
+        if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman) return;
         if (!dragging) return;
         dragging = false;
         pieces[selectedSquare].setX(getX(scene, selectedSquare));
@@ -541,8 +547,8 @@ public class Main extends Application {
             return;
         }
         makeMove(move);
-        makeBotMoveAsync();
-//        if (gameState.isInProgress()) makeMove(bot.getMove(gameState));
+        if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
+            makeBotMoveAsync();
         selectedSquare = -1;
     }
 
@@ -560,11 +566,12 @@ public class Main extends Application {
     }
 
     private void makeBotMoveAsync() {
-        if (!gameState.isInProgress()) return;
+        if (!gameState.isInProgress() || !appOpen) return;
+        selectedSquare = -1;
         new Thread(() -> {
-            makeMove(bot.getMove(gameState, 5.0));
+            makeMove(bot.getMove(gameState, allottedTime));
             gameState.computeMoves();
-//            makeBotMoveAsync();
+            if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman) makeBotMoveAsync();
         }).start();
     }
 
@@ -803,6 +810,7 @@ public class Main extends Application {
     }
 
     public static boolean canSelectSquare(GameState gameState, int from, int to) {
+        if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman) return false;
         boolean isColor = gameState.getBoard()[to] * gameState.getColor() > 0;
         if (isColor) return true;
         if (to == from || !gameState.isInProgress()) return false;
