@@ -91,8 +91,8 @@ public class GameState {
         byte[] newMoves = new byte[moveCount * 3];
         int newMoveCount = 0;
         byte[] move;
-        int currKingIdx = getKingIdx();
-        int kingIdx;
+        byte currKingIdx = getKingIdx();
+        byte kingIdx;
         boolean kingMoved;
         if (currKingIdx == -1) return;
         boolean inCheck = inCheckByNonSlidingPiece(currKingIdx);
@@ -101,8 +101,8 @@ public class GameState {
             pieceTaken = makeMoveOnlyBoard(move);
             illegal = false;
             if (move[0] == -1) {
-                int throughIdx = currKingIdx + move[2];
-                kingIdx = throughIdx + move[2];
+                byte throughIdx = (byte) (currKingIdx + move[2]);
+                kingIdx = (byte) (throughIdx + move[2]);
                 for (byte i = 0; i < 64; i++) {
                     switch (board[i] * color) {
                         case 0:
@@ -170,7 +170,7 @@ public class GameState {
         moveCount = newMoveCount;
     }
 
-    private int getKingIdx() {
+    private byte getKingIdx() {
         for (byte i = 0; i < 64; i++) {
             if (board[i] == 6 * color) {
                 return i;
@@ -179,7 +179,7 @@ public class GameState {
         return -1;
     }
 
-    private boolean inCheckByNonSlidingPiece(int kingIdx) {
+    private boolean inCheckByNonSlidingPiece(byte kingIdx) {
         boolean inCheck;
         for (byte i = 0; i < 64; i++) {
             inCheck = switch (board[i] * color) {
@@ -197,7 +197,7 @@ public class GameState {
         return inCheck(getKingIdx());
     }
 
-    private boolean inCheck(int kingIdx) {
+    private boolean inCheck(byte kingIdx) {
         boolean inCheck;
         for (byte i = 0; i < 64; i++) {
             inCheck = switch (board[i] * color) {
@@ -214,15 +214,15 @@ public class GameState {
         return false;
     }
 
-    private boolean isPawnAttacking(int pawnIdx, int targetIdx) {
-        int forwardSquare = pawnIdx + 8 * color;
+    private boolean isPawnAttacking(byte pawnIdx, byte targetIdx) {
+        byte forwardSquare = (byte) (pawnIdx + 8 * color);
 
         return (forwardSquare - 1 == targetIdx && ((forwardSquare - 1) & 7) != 7) ||
                 (forwardSquare + 1 == targetIdx && ((forwardSquare + 1) & 7) != 0);
     }
 
-    private boolean isKnightAttacking(int knightIdx, int targetIdx) {
-        int knightMod8 = knightIdx & 7;
+    private boolean isKnightAttacking(byte knightIdx, byte targetIdx) {
+        byte knightMod8 = (byte) (knightIdx & 7);
         for (byte j = -2; j <= 2; j += 4) {
             for (byte k = -1; k <= 1; k += 2) {
                 int target = knightIdx + j * 8 + k;
@@ -234,31 +234,31 @@ public class GameState {
         return false;
     }
 
-    private boolean isDiagonalSlidingPieceAttacking(int pieceIdx, int col, int row,
-                                                    int targetIdx, int d1, int d2) {
+    private boolean isDiagonalSlidingPieceAttacking(byte pieceIdx, byte col, byte row,
+                                                    byte targetIdx, byte d1, byte d2) {
         for (byte j = 1; j < 8; j++) {
             col += d1;
             row += d2;
             if (col < 0 || col > 7 || row < 0 || row > 7) break;
-            pieceIdx += d1 + d2 * 8;
+            pieceIdx += (byte) (d1 + d2 * 8);
             if (pieceIdx == targetIdx) return true;
             if (pieceIdx < 0 || pieceIdx > 63 || board[pieceIdx] != 0) break;
         }
         return false;
     }
 
-    private boolean isFileSlidingPieceAttacking(int pieceIdx, int row, int targetIdx, int dir) {
+    private boolean isFileSlidingPieceAttacking(byte pieceIdx, byte row, byte targetIdx, byte dir) {
         for (byte j = 1; j < 8; j++) {
             row += dir;
             if (row < 0 || row > 7) break;
-            pieceIdx += dir * 8;
+            pieceIdx += (byte) (dir * 8);
             if (pieceIdx == targetIdx) return true;
             if (board[pieceIdx] != 0) break;
         }
         return false;
     }
 
-    private boolean isRankSlidingPieceAttacking(int pieceIdx, int col, int targetIdx, int dir) {
+    private boolean isRankSlidingPieceAttacking(byte pieceIdx, byte col, byte targetIdx, byte dir) {
         for (byte j = 1; j < 8; j++) {
             col += dir;
             if (col < 0 || col > 7) break;
@@ -269,41 +269,47 @@ public class GameState {
         return false;
     }
 
-    private boolean isBishopAttacking(int bishopIdx, int targetIdx) {
-        int bishopMod8 = bishopIdx & 7;
-        int bishopDiv8 = bishopIdx / 8;
-        return isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, 1)
-                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, 1, -1)
-                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, 1)
-                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx, -1, -1);
+    private boolean isBishopAttacking(byte bishopIdx, byte targetIdx) {
+        byte bishopMod8 = (byte) (bishopIdx & 7);
+        byte bishopDiv8 = (byte) (bishopIdx / 8);
+        return isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
+                (byte) 1, (byte) 1)
+                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
+                (byte) 1, (byte) -1)
+                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
+                (byte) -1, (byte) 1)
+                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
+                (byte) -1, (byte) -1);
     }
 
-    private boolean isRookAttacking(int rookIdx, int targetIdx) {
-        int rookMod8 = rookIdx & 7;
-        int rookDiv8 = rookIdx / 8;
-        return isFileSlidingPieceAttacking(rookIdx, rookDiv8, targetIdx, 1)
-                || isFileSlidingPieceAttacking(rookIdx, rookDiv8, targetIdx, -1)
-                || isRankSlidingPieceAttacking(rookIdx, rookMod8, targetIdx, 1)
-                || isRankSlidingPieceAttacking(rookIdx, rookMod8, targetIdx, -1);
+    private boolean isRookAttacking(byte rookIdx, byte targetIdx) {
+        byte rookMod8 = (byte) (rookIdx & 7);
+        byte rookDiv8 = (byte) (rookIdx / 8);
+        return isFileSlidingPieceAttacking(rookIdx, rookDiv8, targetIdx, (byte) 1)
+                || isFileSlidingPieceAttacking(rookIdx, rookDiv8, targetIdx, (byte) -1)
+                || isRankSlidingPieceAttacking(rookIdx, rookMod8, targetIdx, (byte) 1)
+                || isRankSlidingPieceAttacking(rookIdx, rookMod8, targetIdx, (byte) -1);
     }
 
-    private boolean isQueenAttacking(int queenIdx, int targetIdx) {
-        int queenMod8 = queenIdx & 7;
-        int queenDiv8 = queenIdx / 8;
-        return isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, 1)
-                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, 1, -1)
-                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, 1)
-                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, -1, -1)
-                || isFileSlidingPieceAttacking(queenIdx, queenDiv8, targetIdx, 1)
-                || isFileSlidingPieceAttacking(queenIdx, queenDiv8, targetIdx, -1)
-                || isRankSlidingPieceAttacking(queenIdx, queenMod8, targetIdx, 1)
-                || isRankSlidingPieceAttacking(queenIdx, queenMod8, targetIdx, -1);
+    private boolean isQueenAttacking(byte queenIdx, byte targetIdx) {
+        byte queenMod8 = (byte) (queenIdx & 7);
+        byte queenDiv8 = (byte) (queenIdx / 8);
+        return isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, (byte) 1, (byte) 1)
+                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, (byte) 1, (byte) -1)
+                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx,
+                (byte) -1, (byte) 1)
+                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx,
+                (byte) -1, (byte) -1)
+                || isFileSlidingPieceAttacking(queenIdx, queenDiv8, targetIdx, (byte) 1)
+                || isFileSlidingPieceAttacking(queenIdx, queenDiv8, targetIdx, (byte) -1)
+                || isRankSlidingPieceAttacking(queenIdx, queenMod8, targetIdx, (byte) 1)
+                || isRankSlidingPieceAttacking(queenIdx, queenMod8, targetIdx, (byte) -1);
     }
 
-    private boolean isKingAttacking(int kingIdx, int targetIdx1, int targetIdx2, int targetIdx3) {
+    private boolean isKingAttacking(byte kingIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3) {
         for (byte j = -1; j <= 1; j++) {
             for (byte k = -1; k <= 1; k++) {
-                int destination = kingIdx + j * 8 + k;
+                byte destination = (byte) (kingIdx + j * 8 + k);
                 if ((destination == targetIdx1 || destination == targetIdx2
                         || destination == targetIdx3) && (kingIdx & 7) + k == (destination & 7))
                     return true;
@@ -312,8 +318,8 @@ public class GameState {
         return false;
     }
 
-    private boolean isPawnAttacking(int pawnIdx, int targetIdx1, int targetIdx2, int targetIdx3) {
-        int forwardSquare = pawnIdx + 8 * color;
+    private boolean isPawnAttacking(byte pawnIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3) {
+        byte forwardSquare = (byte) (pawnIdx + 8 * color);
 
         return ((forwardSquare - 1 == targetIdx1 || forwardSquare - 1 == targetIdx2 ||
                 forwardSquare - 1 == targetIdx3) && ((forwardSquare - 1) & 7) != 7) ||
@@ -321,9 +327,9 @@ public class GameState {
                         forwardSquare + 1 == targetIdx3) && ((forwardSquare + 1) & 7) != 0);
     }
 
-    private boolean isKnightAttacking(int knightIdx, int targetIdx1, int targetIdx2,
-                                      int targetIdx3) {
-        int knightMod8 = knightIdx & 7;
+    private boolean isKnightAttacking(byte knightIdx, byte targetIdx1, byte targetIdx2,
+                                      byte targetIdx3) {
+        byte knightMod8 = (byte) (knightIdx & 7);
         for (byte j = -2; j <= 2; j += 4) {
             for (byte k = -1; k <= 1; k += 2) {
                 int target = knightIdx + j * 8 + k;
@@ -337,10 +343,10 @@ public class GameState {
         return false;
     }
 
-    private boolean isBishopAttacking(int bishopIdx, int targetIdx1, int targetIdx2, int targetIdx3,
+    private boolean isBishopAttacking(byte bishopIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3,
                                       byte[] board) {
-        int bishopMod8 = bishopIdx & 7;
-        int bishopDiv8 = bishopIdx / 8;
+        byte bishopMod8 = (byte) (bishopIdx & 7);
+        byte bishopDiv8 = (byte) (bishopIdx / 8);
         for (byte d1 = -1; d1 <= 1; d1 += 2) {
             for (byte d2 = -1; d2 <= 1; d2 += 2) {
                 for (byte j = 1; j < 8; j++) {
@@ -356,10 +362,10 @@ public class GameState {
         return false;
     }
 
-    private boolean isRookAttacking(int rookIdx, int targetIdx1, int targetIdx2, int targetIdx3,
+    private boolean isRookAttacking(byte rookIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3,
                                     byte[] board) {
-        int rookMod8 = rookIdx & 7;
-        int rookDiv8 = rookIdx / 8;
+        byte rookMod8 = (byte) (rookIdx & 7);
+        byte rookDiv8 = (byte) (rookIdx / 8);
         for (byte d1 = -1; d1 <= 1; d1 += 2) {
             for (byte j = 1; j < 8; j++) {
                 int target = rookIdx + d1 * j;
@@ -383,10 +389,10 @@ public class GameState {
         return false;
     }
 
-    private boolean isQueenAttacking(int queenIdx, int targetIdx1, int targetIdx2, int targetIdx3,
+    private boolean isQueenAttacking(byte queenIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3,
                                      byte[] board) {
-        int queenMod8 = queenIdx & 7;
-        int queenDiv8 = queenIdx / 8;
+        byte queenMod8 = (byte) (queenIdx & 7);
+        byte queenDiv8 = (byte) (queenIdx / 8);
         for (byte d1 = -1; d1 <= 1; d1++) {
             for (byte d2 = -1; d2 <= 1; d2++) {
                 if (d1 == 0 && d2 == 0) continue;
@@ -403,10 +409,10 @@ public class GameState {
         return false;
     }
 
-    private boolean isKingAttacking(int kingIdx, int targetIdx) {
+    private boolean isKingAttacking(byte kingIdx, byte targetIdx) {
         for (byte j = -1; j <= 1; j++) {
             for (byte k = -1; k <= 1; k++) {
-                int destination = kingIdx + j * 8 + k;
+                byte destination = (byte) (kingIdx + j * 8 + k);
                 if (destination == targetIdx && (kingIdx & 7) + k == (destination & 7))
                     return true;
             }
@@ -417,9 +423,9 @@ public class GameState {
     public void computeMovesPseudoLegal() {
         if (moves == null) moves = new byte[654]; // 218 * 3
         moveCount = 0;
-        int pieceType;
+        byte pieceType;
         for (byte i = 0; i < 64; i++) {
-            pieceType = board[i] * color;
+            pieceType = (byte) (board[i] * color);
             if (pieceType <= 0) continue;
             switch (pieceType) {
                 case 1:
@@ -555,7 +561,7 @@ public class GameState {
         }
 
         byte piece = newBoard[move[0]];
-        int captured = newBoard[move[1]];
+        byte captured = newBoard[move[1]];
         newBoard[move[0]] = 0;
         newBoard[move[1]] = piece;
         if (piece == -6) {
@@ -594,7 +600,7 @@ public class GameState {
                     whiteBishops, otherPieces);
         }
 
-        int halfMoveClock = piece == 1 || captured != 0 ? 0 : this.halfMoveClock + 1;
+        byte halfMoveClock = piece == 1 || captured != 0 ? 0 : (byte) (this.halfMoveClock + 1);
 
         if (halfMoveClock > 0) {
             int boardHash = Arrays.hashCode(newBoard);
@@ -655,7 +661,7 @@ public class GameState {
     private void undoMoveOnlyBoard(byte[] move, byte pieceTaken) {
         // Castle
         if (move[0] == -1) {
-            int move_1 = move[1];
+            byte move_1 = move[1];
             board[move_1 + move[2] * 2] = 0;
             board[move_1 + move[2]] = 0;
             board[move_1] = (byte) (6 * color);
@@ -700,7 +706,7 @@ public class GameState {
             return false;
         }
         if (otherPieces == 0) {
-            int minorPieces = whiteKnights + whiteBishops + blackKnights + blackBishops;
+            byte minorPieces = (byte) (whiteKnights + whiteBishops + blackKnights + blackBishops);
             if (minorPieces <= 1) {
                 winner = 0;
                 isWinner = true;
@@ -717,7 +723,7 @@ public class GameState {
         return true;
     }
 
-    public int getWinner() {
+    public byte getWinner() {
         return winner;
     }
 
@@ -725,7 +731,7 @@ public class GameState {
         return board;
     }
 
-    public int getColor() {
+    public byte getColor() {
         return color;
     }
 
@@ -734,7 +740,7 @@ public class GameState {
     }
 
     private void addMovesForKing(byte i) {
-        int idxMod8 = i & 7;
+        byte idxMod8 = (byte) (i & 7);
         for (byte j = -1; j <= 1; j++) {
             for (byte k = -1; k <= 1; k++) {
                 int destination = i + j * 8 + k;
@@ -756,9 +762,9 @@ public class GameState {
         }
     }
 
-    private void addSlidingMoves(byte i, int direction1, int direction2) {
-        int idxMod8 = i & 7;
-        int idxDiv8 = i / 8;
+    private void addSlidingMoves(byte i, byte direction1, byte direction2) {
+        byte idxMod8 = (byte) (i & 7);
+        byte idxDiv8 = (byte) (i / 8);
         for (byte j = 1; j < 8; j++) {
             int target = i + direction1 * j + direction2 * j * 8;
             if (!(0 <= target && target < 64 && (target & 7) == idxMod8 + direction1 * j &&
@@ -776,32 +782,32 @@ public class GameState {
     }
 
     private void addMovesForQueen(byte i) {
-        addSlidingMoves(i, 1, 1);
-        addSlidingMoves(i, 1, -1);
-        addSlidingMoves(i, -1, 1);
-        addSlidingMoves(i, -1, -1);
-        addSlidingMoves(i, 1, 0);
-        addSlidingMoves(i, -1, 0);
-        addSlidingMoves(i, 0, 1);
-        addSlidingMoves(i, 0, -1);
+        addSlidingMoves(i, (byte) 1, (byte) 1);
+        addSlidingMoves(i, (byte) 1, (byte) -1);
+        addSlidingMoves(i, (byte) -1, (byte) 1);
+        addSlidingMoves(i, (byte) -1, (byte) -1);
+        addSlidingMoves(i, (byte) 1, (byte) 0);
+        addSlidingMoves(i, (byte) -1, (byte) 0);
+        addSlidingMoves(i, (byte) 0, (byte) 1);
+        addSlidingMoves(i, (byte) 0, (byte) -1);
     }
 
     private void addMovesForRook(byte i) {
-        addSlidingMoves(i, 1, 0);
-        addSlidingMoves(i, -1, 0);
-        addSlidingMoves(i, 0, 1);
-        addSlidingMoves(i, 0, -1);
+        addSlidingMoves(i, (byte) 1, (byte) 0);
+        addSlidingMoves(i, (byte) -1, (byte) 0);
+        addSlidingMoves(i, (byte) 0, (byte) 1);
+        addSlidingMoves(i, (byte) 0, (byte) -1);
     }
 
     private void addMovesForBishop(byte i) {
-        addSlidingMoves(i, 1, 1);
-        addSlidingMoves(i, 1, -1);
-        addSlidingMoves(i, -1, 1);
-        addSlidingMoves(i, -1, -1);
+        addSlidingMoves(i, (byte) 1, (byte) 1);
+        addSlidingMoves(i, (byte) 1, (byte) -1);
+        addSlidingMoves(i, (byte) -1, (byte) 1);
+        addSlidingMoves(i, (byte) -1, (byte) -1);
     }
 
     private void addMovesForKnight(byte i) {
-        int idxMod8 = i & 7;
+        byte idxMod8 = (byte) (i & 7);
         int target;
         for (byte j = -2; j <= 2; j += 4) {
             for (byte k = -1; k <= 1; k += 2) {
@@ -818,7 +824,7 @@ public class GameState {
     }
 
     private void addMovesForPawn(byte i) {
-        int forwardSquare = i - 8 * color;
+        byte forwardSquare = (byte) (i - 8 * color);
         boolean isPromotion = whiteMove ? i / 8 == 1 : i / 8 == 6;
 
         if (board[forwardSquare] == 0) {
