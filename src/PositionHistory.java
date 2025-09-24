@@ -3,12 +3,6 @@ public class PositionHistory {
     public int count;
     public PositionHistory parent;
 
-    public PositionHistory(int positionHash, PositionHistory parent, int count) {
-        this.positionHash = positionHash;
-        this.count = count;
-        this.parent = parent;
-    }
-
     public PositionHistory(int positionHash, PositionHistory parent) {
         this.positionHash = positionHash;
         this.parent = parent;
@@ -21,6 +15,7 @@ public class PositionHistory {
     }
 
     public PositionHistory(int positionHash) {
-        this(positionHash, null, 1);
+        this.positionHash = positionHash;
+        this.count = 1;
     }
 }

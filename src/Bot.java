@@ -44,8 +44,8 @@ public class Bot {
     private int evaluate(GameState state) {
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
         int score = 0;
-        int[] board = state.getBoard();
-        for (int i = 0; i < 64; i++)
+        byte[] board = state.getBoard();
+        for (byte i = 0; i < 64; i++)
             score += PieceSquareTables.getPieceSquareValue(board[i], i);
         return score;
     }

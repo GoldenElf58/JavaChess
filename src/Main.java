@@ -52,8 +52,8 @@ public class Main extends Application {
     private GameState gameState;
     private List<GameState> gameStateHistory;
     private List<GameState> gameStateFuture;
-    private List<int[]> moveHistory;
-    private List<int[]> moveFuture;
+    private List<byte[]> moveHistory;
+    private List<byte[]> moveFuture;
     private WritableImage pencilImage;
 
     private Rectangle[] squares;
@@ -69,11 +69,11 @@ public class Main extends Application {
     private boolean shown = false;
     private boolean command = false;
     private boolean shift = false;
-    private static final boolean runBenchmarkOnly = false;
+    private static final boolean runBenchmarkOnly = true;
     private static final boolean whitePlayerHuman = false;
     private static final boolean blackPlayerHuman = true;
     private static final double allottedTime = 1.0;
-    private volatile boolean appOpen = true;
+    private volatile boolean appOpen = false;
 
     private final Bot bot = new Bot(true);
 
@@ -121,7 +121,7 @@ public class Main extends Application {
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
         int N = 10000;
-        int warmup = 1000;
+        int warmup = N / 10;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
@@ -137,14 +137,14 @@ public class Main extends Application {
             gameState.computeMoves();
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
+                movesThisGame++;
                 int move = random.nextInt(gameState.getMoveCount());
-//                int move = bot1.getMove(gameState, 4);
 //                newWatch.start();
-//                bot2.getMoveNew(gameState, 3);
+//                int move = bot1.getMove(gameState, 3);
 //                newWatch.stop();
                 gameState = gameState.makeMove(move);
-                movesThisGame++;
                 oldWatch.start();
+//                bot2.getMoveNew(gameState, 3);
                 gameState.computeMoves();
                 oldWatch.stop();
                 if (debug) {
@@ -155,7 +155,7 @@ public class Main extends Application {
 //                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
-            if ((((double) (i + 1) / (N + warmup)) * 100 % 5) == 0)
+            if ((((double) (i + 1) / (N + warmup)) * 100 % 5) < 1.0 / N)
                 System.out.printf("Progress: %.0f%%%n", (double) (i + 1) / (N + warmup) * 100);
             bot1.clearCache();
             bot2.clearCache();
@@ -411,7 +411,7 @@ public class Main extends Application {
             selectedSquare = -1;
             return;
         }
-        int[] move = gameState.findMove(selectedSquare, square);
+        byte[] move = gameState.findMove(selectedSquare, square);
         if (move == null) {
             dragging = true;
             mousePose[0] = e.getX();
@@ -534,7 +534,7 @@ public class Main extends Application {
             firstSelection = true;
             return;
         }
-        int[] move = gameState.findMove(selectedSquare, square);
+        byte[] move = gameState.findMove(selectedSquare, square);
         if (move == null) {
             if (selectedSquare == square) {
                 scene.setCursor(Cursor.OPEN_HAND);
@@ -556,7 +556,7 @@ public class Main extends Application {
         makeMove(gameState.getMove(moveIdx));
     }
 
-    private void makeMove(int[] move) {
+    private void makeMove(byte[] move) {
         gameStateHistory.add(gameState);
         gameStateFuture.clear();
         moveHistory.add(move);

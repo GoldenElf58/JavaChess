@@ -25,7 +25,7 @@ public class SoundHandler {
         new MediaPlayer(soundCache.get(sound)).play();
     }
 
-    public static void playSound(int[] move, GameState gameStateNow, GameState gameStateMoved) {
+    public static void playSound(byte[] move, GameState gameStateNow, GameState gameStateMoved) {
         if (gameStateMoved.inCheck()) {
             playSound("move-check");
             return;
@@ -42,7 +42,7 @@ public class SoundHandler {
             playSound("capture");
             return;
         }
-        int[] board = gameStateNow.getBoard();
+        byte[] board = gameStateNow.getBoard();
         if (board[move[1]] == 0) {
             playSound(gameStateNow.isWhiteMove() ? "move-self" : "move-opponent");
             return;
