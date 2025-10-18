@@ -69,11 +69,15 @@ public class Main extends Application {
     private boolean shown = false;
     private boolean command = false;
     private boolean shift = false;
+    private volatile boolean appOpen = true;
+
+    // ==============================
+    // Parameters
+    // ==============================
     private static final boolean runBenchmarkOnly = false;
     private static final boolean whitePlayerHuman = true;
     private static final boolean blackPlayerHuman = false;
     private static final double allottedTime = 1.0;
-    private volatile boolean appOpen = true;
 
     private final Bot bot = new Bot(true);
 
