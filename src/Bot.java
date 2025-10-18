@@ -45,25 +45,12 @@ public class Bot {
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
         int score = 0;
         byte[] board = state.getBoard();
-        for (byte i = 0; i < 64; i++)
-            score += PieceSquareTables.getPieceSquareValue(board[i], i);
+        for (byte i = 0; i < 64; i++) score += PieceSquareTables.getPieceSquareValue(board[i], i);
         return score;
     }
 
     public int getMove(GameState state, double allottedTime) {
         return iterativeDeepening(state, allottedTime);
-    }
-
-    public int getMove(GameState state, int depth) {
-        for (int i = 1; i < depth; i++)
-            minimaxMove(state, i, state.isWhiteMove());
-        return minimaxMove(state, depth, state.isWhiteMove());
-    }
-
-    public int getMoveNew(GameState state, int depth) {
-        for (int i = 1; i < depth; i++)
-            minimaxMove(state, i, state.isWhiteMove());
-        return minimaxMoveNew(state, depth, state.isWhiteMove());
     }
 
     public int iterativeDeepening(GameState state, double allottedTime) {
@@ -162,74 +149,6 @@ public class Bot {
         int score;
         for (int i = 0; i < state.getMoveCount(); i++) {
             score = minimaxScore(maxDepth - depth > 2 ? gameStates[i] : state.makeMove(i),
-                    depth + 1, maxDepth, !isMaximizing, alpha, beta);
-            if (isMaximizing ? score > bestScore : score < bestScore) {
-                bestScore = score;
-                if (isMaximizing) alpha = score;
-                else beta = score;
-                if (beta <= alpha) break;
-            }
-        }
-        moveCache.get(maxDepth - depth).put(hashKey, bestScore);
-        return bestScore;
-    }
-
-    private int minimaxMoveNew(GameState state, int depth, boolean isMaximizing) {
-        assert depth > 0;
-        state.computeMoves();
-        if (!state.isInProgress()) return 0;
-        while (moveCache.size() < depth) moveCache.add(new HashMap<>());
-        int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
-        int bestMoveIdx = 0;
-        int alpha = Integer.MIN_VALUE / 2;
-        int beta = Integer.MAX_VALUE / 2;
-
-        Integer[] moveSearchOrder = new Integer[state.getMoveCount()];
-        boolean sortMoves = depth > 2;
-        if (sortMoves) {
-            for (int i = 0; i < state.getMoveCount(); i++) moveSearchOrder[i] = i;
-            Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.get(depth - 2).getOrDefault(zobristHash(state.makeMove(m1)), 0)
-                            - moveCache.get(depth - 2).getOrDefault(zobristHash(state.makeMove(m2)), 0)));
-        }
-
-        for (int i = 0; i < state.getMoveCount(); i++) {
-            int score = minimaxScoreNew(state.makeMove(sortMoves ?
-                    moveSearchOrder[i] : i), 1, depth, !isMaximizing, alpha, beta);
-            if (isMaximizing ? score > bestScore : score < bestScore) {
-                bestScore = score;
-                bestMoveIdx = sortMoves ? moveSearchOrder[i] : i;
-                if (isMaximizing) alpha = score;
-                else beta = score;
-            }
-        }
-        score = bestScore;
-        return bestMoveIdx;
-    }
-
-    private int minimaxScoreNew(GameState state, int depth, int maxDepth, boolean isMaximizing,
-                                int alpha, int beta) {
-        if (depth == maxDepth) return evaluate(state);
-        long hashKey = zobristHash(state);
-        if (moveCache.get(maxDepth - depth).containsKey(hashKey))
-            return moveCache.get(maxDepth - depth).get(hashKey);
-        state.computeMoves();
-        if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
-
-        GameState[] gameStates = new GameState[state.getMoveCount()];
-        if (maxDepth - depth > 2) {
-            for (int i = 0; i < state.getMoveCount(); i++) {
-                gameStates[i] = state.makeMove(i);
-            }
-            Arrays.sort(gameStates, (state1, state2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.get(maxDepth - depth - 2).getOrDefault(zobristHash(state1), 0)
-                            - moveCache.get(maxDepth - depth - 2).getOrDefault(zobristHash(state2), 0)));
-        }
-
-        int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
-        int score;
-        for (int i = 0; i < state.getMoveCount(); i++) {
-            score = minimaxScoreNew(maxDepth - depth > 2 ? gameStates[i] : state.makeMove(i),
                     depth + 1, maxDepth, !isMaximizing, alpha, beta);
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
