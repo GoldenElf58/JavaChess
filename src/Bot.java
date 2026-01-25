@@ -157,6 +157,9 @@ public class Bot {
                 if (beta <= alpha) break;
             }
         }
+        if (isMaximizing ? bestScore >= Integer.MAX_VALUE / 2 - 256 :
+                bestScore <= -Integer.MAX_VALUE / 2 + 256)
+            bestScore -= (isMaximizing ? 1 : -1);
         moveCache.get(maxDepth - depth).put(hashKey, bestScore);
         return bestScore;
     }
