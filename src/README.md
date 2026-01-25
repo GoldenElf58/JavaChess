@@ -20,9 +20,6 @@
    8. Click OK
 6. You're ready!
 
-> **Note**: Sorry for the long setup instructions. I'm hoping to find some time and make it 
-> faster and easier.
-
 ## Usage Instructions
 
 ### In Code Settings
