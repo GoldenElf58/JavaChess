@@ -1,4 +1,5 @@
 import java.util.Arrays;
+import java.util.HashMap;
 
 import static java.lang.Math.abs;
 
@@ -35,6 +36,9 @@ public class GameState {
     private final byte blackBishops;
     private final byte whiteBishops;
     private final byte otherPieces;
+    private long hash;
+    private boolean hashSaved;
+    private final HashMap<Integer, GameState> nextStates = new HashMap<>();
 
     GameState() {
         board = startBoard;
@@ -617,7 +621,7 @@ public class GameState {
                 whiteBishops, otherPieces);
     }
 
-    private byte makeMoveOnlyBoard(byte[] move) {
+    public byte makeMoveOnlyBoard(byte[] move) {
         // Castle
         if (move[0] == -1) {
             board[move[1] + move[2] * 2] = (byte) (6 * color);
@@ -657,7 +661,7 @@ public class GameState {
         return pieceTaken;
     }
 
-    private void undoMoveOnlyBoard(byte[] move, byte pieceTaken) {
+    public void undoMoveOnlyBoard(byte[] move, byte pieceTaken) {
         // Castle
         if (move[0] == -1) {
             byte move_1 = move[1];
@@ -893,6 +897,27 @@ public class GameState {
             }
         }
         return null;
+    }
+
+    public void setHash(long hash) {
+        this.hash = hash;
+        hashSaved = true;
+    }
+
+    public long getHash() {
+        return hash;
+    }
+
+    public boolean isHashSaved() {
+        return hashSaved;
+    }
+
+    public void saveState(int move, GameState state) {
+        nextStates.put(move, state);
+    }
+
+    public GameState getState(int move) {
+        return nextStates.getOrDefault(move, null);
     }
 
     public String moveToString(int moveIdx) {

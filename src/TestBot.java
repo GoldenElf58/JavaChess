@@ -1,7 +1,12 @@
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Random;
 
-public class Bot {
+public class TestBot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -14,7 +19,7 @@ public class Bot {
         int depthRemaining;
     }
 
-    public Bot(boolean log) {
+    public TestBot(boolean log) {
         initZobristTable();
         this.log = log;
     }

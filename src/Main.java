@@ -19,8 +19,7 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
 
-import static java.lang.Math.floorDiv;
-import static java.lang.Math.round;
+import static java.lang.Math.*;
 
 public class Main extends Application {
 
@@ -74,7 +73,7 @@ public class Main extends Application {
     // ==============================
     // Parameters
     // ==============================
-    private static final boolean runBenchmarkOnly = false;
+    private static final boolean runBenchmarkOnly = true;
     private static final boolean whitePlayerHuman = true;
     private static final boolean blackPlayerHuman = false;
     private static final double allottedTime = 1.0;
@@ -124,15 +123,18 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 10000;
+        int N = 50;
         int warmup = N / 10;
+        int maxDepth = 3;
+        String version = "both";
+        double lastUpdate = 0;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
         Bot bot1 = new Bot(false);
-        Bot bot2 = new Bot(false);
-        Random random = new Random();
+        TestBot bot2 = new TestBot(false);
+//        Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
@@ -142,15 +144,15 @@ public class Main extends Application {
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
                 movesThisGame++;
-                int move = random.nextInt(gameState.getMoveCount());
-//                newWatch.start();
-//                int move = bot1.getMove(gameState, 3);
-//                newWatch.stop();
-                gameState = gameState.makeMove(move);
+//                int move = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
-//                bot2.getMoveNew(gameState, 3);
-                gameState.computeMoves();
+                int move = bot1.iterativeDeepening(gameState, maxDepth);
                 oldWatch.stop();
+                newWatch.start();
+//                bot2.iterativeDeepening(gameState, maxDepth);
+                newWatch.stop();
+                gameState = gameState.makeMove(move);
+                gameState.computeMoves();
                 if (debug) {
                     if (verbose) {
                         System.out.println(gameState);
@@ -159,8 +161,11 @@ public class Main extends Application {
 //                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
-            if ((((double) (i + 1) / (N + warmup)) * 100 % 5) < 1.0 / N)
-                System.out.printf("Progress: %.0f%%%n", (double) (i + 1) / (N + warmup) * 100);
+            double progress = ((double) (i + 1) / (N + warmup)) * 100;
+            if (progress - lastUpdate > 1) {
+                System.out.printf("\rProgress: %.0f%%", progress);
+                lastUpdate = progress;
+            }
             bot1.clearCache();
             bot2.clearCache();
             if (i + 1 == warmup) watch.start();
@@ -175,6 +180,8 @@ public class Main extends Application {
         }
         watch.stop();
         System.out.println("\n");
+        System.out.printf("Max depth: %d%n", maxDepth);
+        System.out.printf("Version: %s%n", version);
         System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
         System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
