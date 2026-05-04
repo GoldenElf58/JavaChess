@@ -80,6 +80,7 @@ public class Main extends Application {
 
     private final Bot bot = new Bot(true);
 
+    @SuppressWarnings("unused")
     public static void main(String[] args) {
         if (runBenchmarkOnly) {
             runBenchmark();
@@ -123,7 +124,7 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 50;
+        int N = 3000;
         int warmup = N / 10;
         int maxDepth = 3;
         String version = "both";
@@ -134,7 +135,7 @@ public class Main extends Application {
         long[] newTimes = new long[N];
         Bot bot1 = new Bot(false);
         TestBot bot2 = new TestBot(false);
-//        Random random = new Random();
+        Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
@@ -144,15 +145,15 @@ public class Main extends Application {
             int movesThisGame = 0;
             while (gameState.isInProgress()) {
                 movesThisGame++;
-//                int move = random.nextInt(gameState.getMoveCount());
+                int move = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
-                int move = bot1.iterativeDeepening(gameState, maxDepth);
+                gameState = gameState.makeMove(move);
+                gameState.computeMoves();
+//                int move = bot1.iterativeDeepening(gameState, maxDepth);
                 oldWatch.stop();
                 newWatch.start();
 //                bot2.iterativeDeepening(gameState, maxDepth);
                 newWatch.stop();
-                gameState = gameState.makeMove(move);
-                gameState.computeMoves();
                 if (debug) {
                     if (verbose) {
                         System.out.println(gameState);

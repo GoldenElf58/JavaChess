@@ -38,6 +38,8 @@ public class GameState {
     private final byte otherPieces;
     private long hash;
     private boolean hashSaved;
+    private final byte whiteKingSquare;
+    private final byte blackKingSquare;
     private final HashMap<Integer, GameState> nextStates = new HashMap<>();
 
     GameState() {
@@ -59,13 +61,15 @@ public class GameState {
         blackBishops = 2;
         whiteBishops = 2;
         otherPieces = 22;
+        whiteKingSquare = 60;
+        blackKingSquare = 4;
     }
 
     GameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
               boolean blackKing, byte[] lastMove, int halfMoves, byte halfMoveClock,
               boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
               byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
-              byte whiteBishops, byte otherPieces) {
+              byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare) {
         this.board = board;
         this.whiteQueen = whiteQueen;
         this.whiteKing = whiteKing;
@@ -84,6 +88,8 @@ public class GameState {
         this.blackBishops = blackBishops;
         this.whiteBishops = whiteBishops;
         this.otherPieces = otherPieces;
+        this.whiteKingSquare = whiteKingSquare;
+        this.blackKingSquare = blackKingSquare;
     }
 
     public void computeMoves() {
@@ -174,12 +180,7 @@ public class GameState {
     }
 
     private byte getKingIdx() {
-        for (byte i = 0; i < 64; i++) {
-            if (board[i] == 6 * color) {
-                return i;
-            }
-        }
-        return -1;
+        return whiteMove ? whiteKingSquare : blackKingSquare;
     }
 
     private boolean inCheckByNonSlidingPiece(byte kingIdx) {
@@ -507,7 +508,9 @@ public class GameState {
                     null, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
                     new PositionHistory(Arrays.hashCode(newBoard)), false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, otherPieces);
+                    whiteBishops, otherPieces,
+                    whiteMove ? (byte) (move[1] + move[2] * 2) : whiteKingSquare,
+                    !whiteMove ? (byte) (move[1] + move[2] * 2) : blackKingSquare);
         }
 
         // Promotion
@@ -524,7 +527,7 @@ public class GameState {
                     null, halfMoves + 1, (byte) 0, !whiteMove,
                     new PositionHistory(Arrays.hashCode(newBoard)), false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, otherPieces);
+                    whiteBishops, otherPieces, whiteKingSquare, blackKingSquare);
         }
 
         // En Passant
@@ -536,7 +539,7 @@ public class GameState {
                     null, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
                     new PositionHistory(Arrays.hashCode(newBoard)), false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, (byte) (otherPieces - 1));
+                    whiteBishops, (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare);
         }
 
         // Promotion Taking
@@ -560,7 +563,7 @@ public class GameState {
                     null, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
                     new PositionHistory(Arrays.hashCode(newBoard)), false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, (byte) (otherPieces - 1));
+                    whiteBishops, (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare);
         }
 
         byte piece = newBoard[move[0]];
@@ -600,7 +603,7 @@ public class GameState {
                     move, halfMoves + 1, (byte) 0,
                     !whiteMove, new PositionHistory(Arrays.hashCode(newBoard)), false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, otherPieces);
+                    whiteBishops, otherPieces, whiteKingSquare, blackKingSquare);
         }
 
         byte halfMoveClock = piece == 1 || captured != 0 ? 0 : (byte) (this.halfMoveClock + 1);
@@ -612,13 +615,15 @@ public class GameState {
                     null, halfMoves + 1, halfMoveClock,
                     !whiteMove, positionHistory, positionHistory.count >= 3, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, otherPieces);
+                    whiteBishops, otherPieces, piece == 6 ? move[1] : whiteKingSquare,
+                    piece == -6 ? move[1] : blackKingSquare);
         }
 
         return new GameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                 null, halfMoves + 1, (byte) 0, !whiteMove, new PositionHistory(Arrays.hashCode(newBoard)),
                 false, (byte) 0, blackKnights, whiteKnights, blackBishops,
-                whiteBishops, otherPieces);
+                whiteBishops, otherPieces, piece == 6 ? move[1] : whiteKingSquare,
+                piece == -6 ? move[1] : blackKingSquare);
     }
 
     public byte makeMoveOnlyBoard(byte[] move) {
