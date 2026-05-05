@@ -22,10 +22,6 @@ public class Watch {
         return running ? System.nanoTime() - startTime : totalTime;
     }
 
-    public long getElapsedTimeMicros() {
-        return getElapsedTimeNanos() / 1_000;
-    }
-
     public long getElapsedTimeMillis() {
         return getElapsedTimeNanos() / 1_000_000;
     }

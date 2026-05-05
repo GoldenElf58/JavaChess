@@ -103,9 +103,9 @@ public class TestBot {
             } catch (IOException e) {
                 System.out.println("Failed to append to file depths.txt");
             }
+            System.out.println("Depth: " + depth);
+            System.out.println("Score: " + score);
         }
-//        System.out.println("Depth: " + depth);
-//        System.out.println("Score: " + score);
         return move;
     }
 
@@ -122,30 +122,17 @@ public class TestBot {
         boolean sortMoves = depth > 2;
         if (sortMoves) {
             for (int i = 0; i < state.getMoveCount(); i++) {
-//                long hash = zobrist.hash(state.getBoard());
                 moveSearchOrder[i] = i;
                 state.saveState(i, state.makeMove(i));
                 state.getState(i).getHash();
                 state.undoMove();
-//                if (hash != zobrist.hash(state.getBoard())) {
-//                    System.out.println("Z State\n" + state);
-//                    throw new RuntimeException("Hash mismatch");
-//                }
             }
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
                     (moveCache.getOrDefault(state.getState(m1).getHash(), emptyTT).score
                             - moveCache.getOrDefault(state.getState(m2).getHash(), emptyTT).score));
         }
         MutableGameState nextState;
-//        long hash = zobrist.hash(state.getBoard());
         for (int i = 0; i < state.getMoveCount(); i++) {
-//            System.out.println(sortMoves);
-//            System.out.println("State\n" + state);
-//            if (hash != zobrist.hash(state.getBoard())) {
-//                nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
-//                System.out.println("Next State\n" + nextState);
-//                throw new RuntimeException("Hash mismatch");
-//            }
             nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
@@ -170,28 +157,17 @@ public class TestBot {
             if (entry.depthRemaining >= maxDepth - depth) return entry.score;
             thisEntry = entry;
         } else thisEntry = new TTEntry();
-//        long hash = zobrist.hash(state.getBoard());
-//        System.out.println("True O State\n" + state);
         state.computeMoves();
-//        if (hash != zobrist.hash(state.getBoard())) {
-//            System.out.println("O State\n" + state);
-//            throw new RuntimeException("Hash mismatch");
-//        }
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
 
         Integer[] moveSearchOrder = new Integer[state.getMoveCount()];
         boolean sortMoves = maxDepth - depth > 2;
         if (sortMoves) {
             for (int i = 0; i < state.getMoveCount(); i++) {
-//                hash = zobrist.hash(state.getBoard());
                 moveSearchOrder[i] = i;
                 state.saveState(i, state.makeMove(i));
                 state.getState(i).getHash();
                 state.undoMove();
-//                if (hash != zobrist.hash(state.getBoard())) {
-//                    System.out.println("A State\n" + state);
-//                    throw new RuntimeException("Hash mismatch");
-//                }
             }
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
                     (moveCache.getOrDefault(state.getState(m1).getHash(), emptyTT).score
@@ -201,19 +177,10 @@ public class TestBot {
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
         MutableGameState nextState;
-//        System.out.println("BB State\n" + state);
         for (int i = 0; i < state.getMoveCount(); i++) {
-//            hash = zobrist.hash(state.getBoard());
             nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
-//            System.out.println("B Next State\n" + nextState);
             score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
-//            if (hash != zobrist.hash(state.getBoard())) {
-//                System.out.println(sortMoves);
-//                System.out.println("B State\n" + state);
-//
-//                throw new RuntimeException("Hash mismatch");
-//            }
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
                 if (isMaximizing) alpha = score;

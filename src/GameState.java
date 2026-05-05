@@ -1,5 +1,3 @@
-import java.util.HashMap;
-
 import static java.lang.Math.abs;
 
 public class GameState {
@@ -39,7 +37,6 @@ public class GameState {
     private boolean hashSaved;
     private final byte whiteKingSquare;
     private final byte blackKingSquare;
-    private final HashMap<Integer, GameState> nextStates = new HashMap<>();
     private final ZobristHash zobrist;
 
     GameState() {

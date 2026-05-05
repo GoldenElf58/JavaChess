@@ -4,16 +4,6 @@ import static java.lang.Math.abs;
 
 public class MutableGameState {
 
-    static private final byte[] startBoard = {
-            -4, -2, -3, -5, -6, -3, -2, -4,
-            -1, -1, -1, -1, -1, -1, -1, -1,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            1, 1, 1, 1, 1, 1, 1, 1,
-            4, 2, 3, 5, 6, 3, 2, 4
-    };
     private final byte[] board;
     public final boolean whiteQueen;
     public final boolean whiteKing;
@@ -904,23 +894,6 @@ public class MutableGameState {
 
     public MutableGameState getState(int move) {
         return nextStates.getOrDefault(move, null);
-    }
-
-    public String moveToString(int moveIdx) {
-        return moveToString(getMove(moveIdx));
-    }
-
-    public String moveToString(byte[] move) {
-        return String.format("%c%d %c%d", 'a' + (move[0] & 7), 8 - move[0] / 8,
-                'a' + (move[1] & 7), 8 - move[1] / 8);
-    }
-
-    public String moveRepr(int moveIdx) {
-        return moveRepr(getMove(moveIdx));
-    }
-
-    public String moveRepr(byte[] move) {
-        return String.format("(%d, %d, %d)", move[0], move[1], move[2]);
     }
 
     public String toString() {
