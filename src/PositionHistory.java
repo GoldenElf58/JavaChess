@@ -1,9 +1,9 @@
 public class PositionHistory {
-    public int positionHash;
+    public long positionHash;
     public int count;
     public PositionHistory parent;
 
-    public PositionHistory(int positionHash, PositionHistory parent) {
+    public PositionHistory(long positionHash, PositionHistory parent) {
         this.positionHash = positionHash;
         this.parent = parent;
         this.count = 1;
@@ -14,7 +14,7 @@ public class PositionHistory {
         }
     }
 
-    public PositionHistory(int positionHash) {
+    public PositionHistory(long positionHash) {
         this.positionHash = positionHash;
         this.count = 1;
     }

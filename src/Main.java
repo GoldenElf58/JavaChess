@@ -80,7 +80,7 @@ public class Main extends Application {
 
     private final Bot bot = new Bot(true);
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
         if (runBenchmarkOnly) {
             runBenchmark();
@@ -124,10 +124,11 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 3000;
+        int N = 50;
         int warmup = N / 10;
         int maxDepth = 3;
-        String version = "both";
+        boolean useBot1 = true;
+        boolean useTestBot = false;
         double lastUpdate = 0;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
@@ -147,13 +148,13 @@ public class Main extends Application {
                 movesThisGame++;
                 int move = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
-                gameState = gameState.makeMove(move);
-                gameState.computeMoves();
-//                int move = bot1.iterativeDeepening(gameState, maxDepth);
+                if (useBot1) move = bot1.iterativeDeepening(gameState, maxDepth);
                 oldWatch.stop();
                 newWatch.start();
-//                bot2.iterativeDeepening(gameState, maxDepth);
+                if (useTestBot) bot2.iterativeDeepening(gameState, maxDepth);
                 newWatch.stop();
+                gameState = gameState.makeMove(move);
+                gameState.computeMoves();
                 if (debug) {
                     if (verbose) {
                         System.out.println(gameState);
@@ -163,9 +164,12 @@ public class Main extends Application {
                 }
             }
             double progress = ((double) (i + 1) / (N + warmup)) * 100;
-            if (progress - lastUpdate > 1) {
-                System.out.printf("\rProgress: %.0f%%", progress);
-                lastUpdate = progress;
+            if (progress - lastUpdate >= 1) {
+                int totalBars = 20;
+                int filledBars = (int) (progress / 100 * totalBars);
+                String bar = "█".repeat(filledBars) + "░".repeat(totalBars - filledBars);
+                System.out.printf("\r%.0f%% [%s] [%ss]", progress, bar, watch.getElapsedTimeSeconds());
+                lastUpdate = (int) progress;
             }
             bot1.clearCache();
             bot2.clearCache();
@@ -182,7 +186,8 @@ public class Main extends Application {
         watch.stop();
         System.out.println("\n");
         System.out.printf("Max depth: %d%n", maxDepth);
-        System.out.printf("Version: %s%n", version);
+        System.out.printf("Use Bot 1: %b%n", useBot1);
+        System.out.printf("Use Bot 1: %b%n", useTestBot);
         System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
         System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));

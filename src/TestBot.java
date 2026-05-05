@@ -4,13 +4,11 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Random;
 
 public class TestBot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
-    private final long[][] zobristTable = new long[65][13];
     private final boolean log;
     private final TTEntry emptyTT = new TTEntry();
 
@@ -20,7 +18,6 @@ public class TestBot {
     }
 
     public TestBot(boolean log) {
-        initZobristTable();
         this.log = log;
     }
 
@@ -28,31 +25,7 @@ public class TestBot {
         moveCache.clear();
     }
 
-    private void initZobristTable() {
-        Random random = new Random();
-        for (int i = 0; i < 65; i++) {
-            for (int j = 0; j < 13; j++) {
-                zobristTable[i][j] = random.nextLong();
-            }
-        }
-    }
-
-    private long zobristHash(GameState state) {
-        long hash = 0;
-        for (int i = 0; i < 64; i++) {
-            int piece = state.getBoard()[i];
-            if (piece == 0) continue;
-            hash ^= zobristTable[i][piece + 6];
-        }
-        if (state.whiteKing) hash ^= zobristTable[64][0];
-        if (state.whiteQueen) hash ^= zobristTable[64][1];
-        if (state.blackKing) hash ^= zobristTable[64][2];
-        if (state.blackQueen) hash ^= zobristTable[64][3];
-        if (state.isWhiteMove()) hash ^= zobristTable[64][4];
-        return hash;
-    }
-
-    private int evaluate(GameState state) {
+    private int evaluate(MutableGameState state) {
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
         int score = 0;
         byte[] board = state.getBoard();
@@ -76,7 +49,7 @@ public class TestBot {
             if (!thread.isAlive()) {
                 if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
                 thread = new Thread(() -> {
-                    move[0] = minimaxMove(state, depth[0], state.isWhiteMove());
+                    move[0] = minimaxMove(state.asMutable(), depth[0], state.isWhiteMove());
                     depth[0]++;
                 });
                 thread.start();
@@ -112,7 +85,7 @@ public class TestBot {
         score = 0;
         while (depth <= maxDepth) {
             if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
-            move = minimaxMove(state, depth, state.isWhiteMove());
+            move = minimaxMove(state.asMutable(), depth, state.isWhiteMove());
             depth++;
         }
         if (log) {
@@ -136,11 +109,10 @@ public class TestBot {
         return move;
     }
 
-    public int minimaxMove(GameState state, int depth, boolean isMaximizing) {
+    public int minimaxMove(MutableGameState state, int depth, boolean isMaximizing) {
         assert depth > 0;
         state.computeMoves();
         if (!state.isInProgress()) return -1;
-//        while (moveCache.size() < depth) moveCache.add(new HashMap<>());
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int bestMoveIdx = 0;
         int alpha = Integer.MIN_VALUE / 2;
@@ -150,17 +122,33 @@ public class TestBot {
         boolean sortMoves = depth > 2;
         if (sortMoves) {
             for (int i = 0; i < state.getMoveCount(); i++) {
+//                long hash = zobrist.hash(state.getBoard());
                 moveSearchOrder[i] = i;
                 state.saveState(i, state.makeMove(i));
+                state.getState(i).getHash();
+                state.undoMove();
+//                if (hash != zobrist.hash(state.getBoard())) {
+//                    System.out.println("Z State\n" + state);
+//                    throw new RuntimeException("Hash mismatch");
+//                }
             }
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.getOrDefault(zobristHash(state.getState(m1)), emptyTT).score
-                            - moveCache.getOrDefault(zobristHash(state.getState(m2)), emptyTT).score));
+                    (moveCache.getOrDefault(state.getState(m1).getHash(), emptyTT).score
+                            - moveCache.getOrDefault(state.getState(m2).getHash(), emptyTT).score));
         }
-
+        MutableGameState nextState;
+//        long hash = zobrist.hash(state.getBoard());
         for (int i = 0; i < state.getMoveCount(); i++) {
-            int score = minimaxScore(sortMoves ? state.getState(moveSearchOrder[i]) :
-                            state.makeMove(i), 1, depth, !isMaximizing, alpha, beta);
+//            System.out.println(sortMoves);
+//            System.out.println("State\n" + state);
+//            if (hash != zobrist.hash(state.getBoard())) {
+//                nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+//                System.out.println("Next State\n" + nextState);
+//                throw new RuntimeException("Hash mismatch");
+//            }
+            nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+            int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
+            state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
                 bestMoveIdx = sortMoves ? moveSearchOrder[i] : i;
@@ -168,39 +156,64 @@ public class TestBot {
                 else beta = score;
             }
         }
-        score = bestScore;
+        this.score = bestScore;
         return bestMoveIdx;
     }
 
-    private int minimaxScore(GameState state, int depth, int maxDepth, boolean isMaximizing,
+    private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
         if (depth == maxDepth) return evaluate(state);
-        long hashKey = state.isHashSaved() ? state.getHash() : zobristHash(state);
+        long hashKey = state.getHash();
         TTEntry thisEntry;
         if (moveCache.containsKey(hashKey)) {
             TTEntry entry = moveCache.get(hashKey);
             if (entry.depthRemaining >= maxDepth - depth) return entry.score;
             thisEntry = entry;
         } else thisEntry = new TTEntry();
+//        long hash = zobrist.hash(state.getBoard());
+//        System.out.println("True O State\n" + state);
         state.computeMoves();
+//        if (hash != zobrist.hash(state.getBoard())) {
+//            System.out.println("O State\n" + state);
+//            throw new RuntimeException("Hash mismatch");
+//        }
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
 
-        GameState[] gameStates = new GameState[state.getMoveCount()];
-        if (maxDepth - depth > 2) {
+        Integer[] moveSearchOrder = new Integer[state.getMoveCount()];
+        boolean sortMoves = maxDepth - depth > 2;
+        if (sortMoves) {
             for (int i = 0; i < state.getMoveCount(); i++) {
-                gameStates[i] = state.makeMove(i);
-                state.setHash(zobristHash(state));
+//                hash = zobrist.hash(state.getBoard());
+                moveSearchOrder[i] = i;
+                state.saveState(i, state.makeMove(i));
+                state.getState(i).getHash();
+                state.undoMove();
+//                if (hash != zobrist.hash(state.getBoard())) {
+//                    System.out.println("A State\n" + state);
+//                    throw new RuntimeException("Hash mismatch");
+//                }
             }
-            Arrays.sort(gameStates, (state1, state2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.getOrDefault(state1.getHash(), emptyTT).score
-                            - moveCache.getOrDefault(state2.getHash(), emptyTT).score));
+            Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
+                    (moveCache.getOrDefault(state.getState(m1).getHash(), emptyTT).score
+                            - moveCache.getOrDefault(state.getState(m2).getHash(), emptyTT).score));
         }
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
+        MutableGameState nextState;
+//        System.out.println("BB State\n" + state);
         for (int i = 0; i < state.getMoveCount(); i++) {
-            score = minimaxScore(maxDepth - depth > 2 ? gameStates[i] : state.makeMove(i),
-                    depth + 1, maxDepth, !isMaximizing, alpha, beta);
+//            hash = zobrist.hash(state.getBoard());
+            nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+//            System.out.println("B Next State\n" + nextState);
+            score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
+            state.undoMove();
+//            if (hash != zobrist.hash(state.getBoard())) {
+//                System.out.println(sortMoves);
+//                System.out.println("B State\n" + state);
+//
+//                throw new RuntimeException("Hash mismatch");
+//            }
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
                 if (isMaximizing) alpha = score;
