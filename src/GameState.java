@@ -96,7 +96,6 @@ public class GameState {
     public void computeMoves() {
         if (moveCount != 0) return;
         computeMovesPseudoLegal();
-        byte[] board = this.board;
         byte pieceTaken;
         boolean illegal;
         byte[] newMoves = new byte[moveCount * 3];
@@ -106,7 +105,7 @@ public class GameState {
         byte kingIdx;
         boolean kingMoved;
         if (currKingIdx == -1) return;
-        boolean inCheck = inCheckByNonSlidingPiece(currKingIdx);
+        boolean inCheck = inCheckByNonSlidingPiece(currKingIdx, color);
         for (byte moveIdx = 0; moveIdx < moveCount; moveIdx++) {
             move = getMove(moveIdx);
             pieceTaken = makeMoveOnlyBoard(move);
@@ -114,57 +113,26 @@ public class GameState {
             if (move[0] == -1) {
                 byte throughIdx = (byte) (currKingIdx + move[2]);
                 kingIdx = (byte) (throughIdx + move[2]);
-                for (byte i = 0; i < 64; i++) {
-                    switch (board[i] * color) {
-                        case 0:
-                            break;
-                        case -1:
-                            illegal = isPawnAttacking(i, kingIdx, currKingIdx, throughIdx);
-                            break;
-                        case -2:
-                            illegal = isKnightAttacking(i, kingIdx, currKingIdx, throughIdx);
-                            break;
-                        case -3:
-                            illegal = isBishopAttacking(i, kingIdx, currKingIdx, throughIdx, board);
-                            break;
-                        case -4:
-                            illegal = isRookAttacking(i, kingIdx, currKingIdx, throughIdx, board);
-                            break;
-                        case -5:
-                            illegal = isQueenAttacking(i, kingIdx, currKingIdx, throughIdx, board);
-                            break;
-                        case -6:
-                            illegal = isKingAttacking(i, kingIdx, currKingIdx, throughIdx);
-                            break;
-                    }
-                    if (illegal) break;
-                }
+                if (isAttackedDiagonally(kingIdx, color) || isAttackedDiagonally(currKingIdx, color)
+                        || isAttackedDiagonally(throughIdx, color)) illegal = true;
+                else if (isAttackedOrthagonally(kingIdx, color) ||
+                        isAttackedOrthagonally(currKingIdx, color) ||
+                        isAttackedOrthagonally(throughIdx, color)) illegal = true;
+                else if (isAttackedByPawn(kingIdx, color) || isAttackedByPawn(currKingIdx, color)
+                        || isAttackedByPawn(throughIdx, color)) illegal = true;
+                else if (isAttackedByKing(kingIdx, color) || isAttackedByKing(currKingIdx, color)
+                        || isAttackedByKing(throughIdx, color)) illegal = true;
+                else if (isAttackedByKnight(kingIdx, color) || isAttackedByKnight(currKingIdx, color)
+                        || isAttackedByKnight(throughIdx, color)) illegal = true;
             } else {
                 kingMoved = move[0] >= 0 && move[2] == 6;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
-                for (byte i = 0; i < 64 && !illegal; i++) {
-                    switch (board[i] * color) { // make board local
-                        case 0:
-                            break;
-                        case -1:
-                            if (kingMoved || inCheck) illegal = isPawnAttacking(i, kingIdx);
-                            break;
-                        case -2:
-                            if (kingMoved || inCheck) illegal = isKnightAttacking(i, kingIdx);
-                            break;
-                        case -3:
-                            illegal = isBishopAttacking(i, kingIdx);
-                            break;
-                        case -4:
-                            illegal = isRookAttacking(i, kingIdx);
-                            break;
-                        case -5:
-                            illegal = isQueenAttacking(i, kingIdx);
-                            break;
-                        case -6:
-                            if (kingMoved || inCheck) illegal = isKingAttacking(i, kingIdx);
-                            break;
-                    }
+                if (isAttackedDiagonally(kingIdx, color)) illegal = true;
+                else if (isAttackedOrthagonally(kingIdx, color)) illegal = true;
+                else if (kingMoved || inCheck) {
+                    if (isAttackedByPawn(kingIdx, color)) illegal = true;
+                    else if (isAttackedByKnight(kingIdx, color)) illegal = true;
+                    else if (isAttackedByKing(kingIdx, color)) illegal = true;
                 }
             }
             undoMoveOnlyBoard(move, pieceTaken);
@@ -180,249 +148,106 @@ public class GameState {
         moveCount = newMoveCount;
     }
 
-    private byte getKingIdx() {
-        return whiteMove ? whiteKingSquare : blackKingSquare;
-    }
-
-    private boolean inCheckByNonSlidingPiece(byte kingIdx) {
-        boolean inCheck;
-        for (byte i = 0; i < 64; i++) {
-            inCheck = switch (board[i] * color) {
-                case -1 -> isPawnAttacking(i, kingIdx);
-                case -2 -> isKnightAttacking(i, kingIdx);
-                case -6 -> isKingAttacking(i, kingIdx);
-                default -> false;
-            };
-            if (inCheck) return true;
-        }
-        return false;
-    }
-
-    public boolean inCheck() {
-        return inCheck(getKingIdx());
-    }
-
-    private boolean inCheck(byte kingIdx) {
-        boolean inCheck;
-        for (byte i = 0; i < 64; i++) {
-            inCheck = switch (board[i] * color) {
-                case -1 -> isPawnAttacking(i, kingIdx);
-                case -2 -> isKnightAttacking(i, kingIdx);
-                case -3 -> isBishopAttacking(i, kingIdx);
-                case -4 -> isRookAttacking(i, kingIdx);
-                case -5 -> isQueenAttacking(i, kingIdx);
-                case -6 -> isKingAttacking(i, kingIdx);
-                default -> false;
-            };
-            if (inCheck) return true;
-        }
-        return false;
-    }
-
-    private boolean isPawnAttacking(byte pawnIdx, byte targetIdx) {
-        byte forwardSquare = (byte) (pawnIdx + 8 * color);
-
-        return (forwardSquare - 1 == targetIdx && ((forwardSquare - 1) & 7) != 7) ||
-                (forwardSquare + 1 == targetIdx && ((forwardSquare + 1) & 7) != 0);
-    }
-
-    private boolean isKnightAttacking(byte knightIdx, byte targetIdx) {
-        byte knightMod8 = (byte) (knightIdx & 7);
-        for (byte j = -2; j <= 2; j += 4) {
-            for (byte k = -1; k <= 1; k += 2) {
-                byte target = (byte) (knightIdx + j * 8 + k);
-                if (knightMod8 + k == (target & 7) && target == targetIdx) return true;
-                target = (byte) (knightIdx + j + k * 8);
-                if (knightMod8 + j == (target & 7) && target == targetIdx) return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isDiagonalSlidingPieceAttacking(byte pieceIdx, byte col, byte row,
-                                                    byte targetIdx, byte d1, byte d2) {
-        for (byte j = 1; j < 8; j++) {
-            col += d1;
-            row += d2;
-            if (col < 0 || col > 7 || row < 0 || row > 7) break;
-            pieceIdx += (byte) (d1 + d2 * 8);
-            if (pieceIdx == targetIdx) return true;
-            if (pieceIdx < 0 || pieceIdx > 63 || board[pieceIdx] != 0) break;
-        }
-        return false;
-    }
-
-    private boolean isFileSlidingPieceAttacking(byte pieceIdx, byte row, byte targetIdx, byte dir) {
-        for (byte j = 1; j < 8; j++) {
-            row += dir;
-            if (row < 0 || row > 7) break;
-            pieceIdx += (byte) (dir * 8);
-            if (pieceIdx == targetIdx) return true;
-            if (board[pieceIdx] != 0) break;
-        }
-        return false;
-    }
-
-    private boolean isRankSlidingPieceAttacking(byte pieceIdx, byte col, byte targetIdx, byte dir) {
-        for (byte j = 1; j < 8; j++) {
-            col += dir;
-            if (col < 0 || col > 7) break;
-            pieceIdx += dir;
-            if (pieceIdx == targetIdx) return true;
-            if (board[pieceIdx] != 0) break;
-        }
-        return false;
-    }
-
-    private boolean isBishopAttacking(byte bishopIdx, byte targetIdx) {
-        byte bishopMod8 = (byte) (bishopIdx & 7);
-        byte bishopDiv8 = (byte) (bishopIdx / 8);
-        return isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
-                (byte) 1, (byte) 1)
-                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
-                (byte) 1, (byte) -1)
-                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
-                (byte) -1, (byte) 1)
-                || isDiagonalSlidingPieceAttacking(bishopIdx, bishopMod8, bishopDiv8, targetIdx,
-                (byte) -1, (byte) -1);
-    }
-
-    private boolean isRookAttacking(byte rookIdx, byte targetIdx) {
-        byte rookMod8 = (byte) (rookIdx & 7);
-        byte rookDiv8 = (byte) (rookIdx / 8);
-        return isFileSlidingPieceAttacking(rookIdx, rookDiv8, targetIdx, (byte) 1)
-                || isFileSlidingPieceAttacking(rookIdx, rookDiv8, targetIdx, (byte) -1)
-                || isRankSlidingPieceAttacking(rookIdx, rookMod8, targetIdx, (byte) 1)
-                || isRankSlidingPieceAttacking(rookIdx, rookMod8, targetIdx, (byte) -1);
-    }
-
-    private boolean isQueenAttacking(byte queenIdx, byte targetIdx) {
-        byte queenMod8 = (byte) (queenIdx & 7);
-        byte queenDiv8 = (byte) (queenIdx / 8);
-        return isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, (byte) 1, (byte) 1)
-                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx, (byte) 1, (byte) -1)
-                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx,
-                (byte) -1, (byte) 1)
-                || isDiagonalSlidingPieceAttacking(queenIdx, queenMod8, queenDiv8, targetIdx,
-                (byte) -1, (byte) -1)
-                || isFileSlidingPieceAttacking(queenIdx, queenDiv8, targetIdx, (byte) 1)
-                || isFileSlidingPieceAttacking(queenIdx, queenDiv8, targetIdx, (byte) -1)
-                || isRankSlidingPieceAttacking(queenIdx, queenMod8, targetIdx, (byte) 1)
-                || isRankSlidingPieceAttacking(queenIdx, queenMod8, targetIdx, (byte) -1);
-    }
-
-    private boolean isKingAttacking(byte kingIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3) {
-        for (byte j = -1; j <= 1; j++) {
-            for (byte k = -1; k <= 1; k++) {
-                byte destination = (byte) (kingIdx + j * 8 + k);
-                if ((destination == targetIdx1 || destination == targetIdx2
-                        || destination == targetIdx3) && (kingIdx & 7) + k == (destination & 7))
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isPawnAttacking(byte pawnIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3) {
-        byte forwardSquare = (byte) (pawnIdx + 8 * color);
-
-        return ((forwardSquare - 1 == targetIdx1 || forwardSquare - 1 == targetIdx2 ||
-                forwardSquare - 1 == targetIdx3) && ((forwardSquare - 1) & 7) != 7) ||
-                ((forwardSquare + 1 == targetIdx1 || forwardSquare + 1 == targetIdx2 ||
-                        forwardSquare + 1 == targetIdx3) && ((forwardSquare + 1) & 7) != 0);
-    }
-
-    private boolean isKnightAttacking(byte knightIdx, byte targetIdx1, byte targetIdx2,
-                                      byte targetIdx3) {
-        byte knightMod8 = (byte) (knightIdx & 7);
-        for (byte j = -2; j <= 2; j += 4) {
-            for (byte k = -1; k <= 1; k += 2) {
-                byte target = (byte) (knightIdx + j * 8 + k);
-                if (knightMod8 + k == (target & 7) && (target == targetIdx1
-                        || target == targetIdx2 || target == targetIdx3)) return true;
-                target = (byte) (knightIdx + j + k * 8);
-                if (knightMod8 + j == (target & 7) && (target == targetIdx1
-                        || target == targetIdx2 || target == targetIdx3)) return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isBishopAttacking(byte bishopIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3,
-                                      byte[] board) {
-        byte bishopMod8 = (byte) (bishopIdx & 7);
-        byte bishopDiv8 = (byte) (bishopIdx / 8);
+    private boolean isAttackedDiagonally(byte kingIdx, byte color) {
+        byte kingMod8 = (byte) (kingIdx & 7);
+        byte kingDiv8 = (byte) (kingIdx / 8);
+        byte piece, target;
         for (byte d1 = -1; d1 <= 1; d1 += 2) {
             for (byte d2 = -1; d2 <= 1; d2 += 2) {
                 for (byte j = 1; j < 8; j++) {
-                    byte target = (byte) (bishopIdx + d1 * j + d2 * j * 8);
-                    if (!((target & 7) == bishopMod8 + d1 * j && target / 8 == bishopDiv8 + d2 * j))
+                    target = (byte) (kingIdx + d1 * j + d2 * j * 8);
+                    if (!((target & 7) == kingMod8 + d1 * j && target / 8 == kingDiv8 + d2 * j))
                         break;
-                    if (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)
-                        return true;
-                    if (target < 0 || target > 63 || board[target] != 0) break;
+                    if (target < 0 || target > 63) break;
+                    piece = board[target];
+                    if (piece == -3 * color || piece == -5 * color) return true;
+                    if (piece != 0) break;
                 }
             }
         }
         return false;
     }
 
-    private boolean isRookAttacking(byte rookIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3,
-                                    byte[] board) {
-        byte rookMod8 = (byte) (rookIdx & 7);
-        byte rookDiv8 = (byte) (rookIdx / 8);
+    private boolean isAttackedOrthagonally(byte kingIdx, byte color) {
+        byte kingMod8 = (byte) (kingIdx & 7);
+        byte kingDiv8 = (byte) (kingIdx / 8);
+        byte piece, target;
         for (byte d1 = -1; d1 <= 1; d1 += 2) {
             for (byte j = 1; j < 8; j++) {
-                byte target = (byte) (rookIdx + d1 * j);
-                if (!((target & 7) == rookMod8 + d1 * j && target / 8 == rookDiv8))
-                    break;
-                if (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)
-                    return true;
-                if (board[target] != 0) break;
+                target = (byte) (kingIdx + d1 * j);
+                if (!((target & 7) == kingMod8 + d1 * j && target / 8 == kingDiv8)) break;
+                piece = board[target];
+                if (piece == -4 * color || piece == -5 * color) return true;
+                if (piece != 0) break;
             }
         }
         for (byte d2 = -1; d2 <= 1; d2 += 2) {
             for (byte j = 1; j < 8; j++) {
-                byte target = (byte) (rookIdx + d2 * j * 8);
-                if (!((target & 7) == rookMod8 && target / 8 == rookDiv8 + d2 * j))
-                    break;
-                if (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)
-                    return true;
-                if (target < 0 || target > 63 || board[target] != 0) break;
+                target = (byte) (kingIdx + d2 * j * 8);
+                if (!((target & 7) == kingMod8 && target / 8 == kingDiv8 + d2 * j)) break;
+                if (target < 0 || target > 63) break;
+                piece = board[target];
+                if (piece == -4 * color || piece == -5 * color) return true;
+                if (piece != 0) break;
             }
         }
         return false;
     }
 
-    private boolean isQueenAttacking(byte queenIdx, byte targetIdx1, byte targetIdx2, byte targetIdx3,
-                                     byte[] board) {
-        byte queenMod8 = (byte) (queenIdx & 7);
-        byte queenDiv8 = (byte) (queenIdx / 8);
-        for (byte d1 = -1; d1 <= 1; d1++) {
-            for (byte d2 = -1; d2 <= 1; d2++) {
-                if (d1 == 0 && d2 == 0) continue;
-                for (byte j = 1; j < 8; j++) {
-                    byte target = (byte) (queenIdx + d1 * j + d2 * j * 8);
-                    if (!((target & 7) == queenMod8 + d1 * j && target / 8 == queenDiv8 + d2 * j))
-                        break;
-                    if (target == targetIdx1 || target == targetIdx2 || target == targetIdx3)
-                        return true;
-                    if (target < 0 || target > 63 || board[target] != 0) break;
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean isKingAttacking(byte kingIdx, byte targetIdx) {
+    private boolean isAttackedByKing(byte kingIdx, byte color) {
+        byte destination;
         for (byte j = -1; j <= 1; j++) {
             for (byte k = -1; k <= 1; k++) {
-                byte destination = (byte) (kingIdx + j * 8 + k);
-                if (destination == targetIdx && (kingIdx & 7) + k == (destination & 7))
+                destination = (byte) (kingIdx + j * 8 + k);
+                if ((kingIdx & 7) + k == (destination & 7) && 0 <= destination && destination <= 63
+                        && board[destination] == -6 * color)
                     return true;
             }
         }
         return false;
+    }
+
+    private boolean isAttackedByKnight(byte kingIdx, byte color) {
+        byte kingMod8 = (byte) (kingIdx & 7);
+        byte target;
+        for (byte j = -2; j <= 2; j += 4) {
+            for (byte k = -1; k <= 1; k += 2) {
+                target = (byte) (kingIdx + j * 8 + k);
+                if (kingMod8 + k == (target & 7) && 0 <= target && target <= 63 &&
+                        board[target] == -2 * color) return true;
+                target = (byte) (kingIdx + j + k * 8);
+                if (kingMod8 + j == (target & 7) && 0 <= target && target <= 63 &&
+                        board[target] == -2 * color) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAttackedByPawn(byte kingIdx, byte color) {
+        byte forwardSquare = (byte) (kingIdx - 8 * color);
+        if (forwardSquare < 0 || forwardSquare > 63) return false;
+
+        return (((forwardSquare - 1) & 7) != 7) && board[forwardSquare - 1] == -color ||
+                (((forwardSquare + 1) & 7) != 0) && board[forwardSquare + 1] == -color;
+    }
+
+    private byte getKingIdx() {
+        return whiteMove ? whiteKingSquare : blackKingSquare;
+    }
+
+    private boolean inCheckByNonSlidingPiece(byte kingIdx, byte color) {
+        if (isAttackedByPawn(kingIdx, color)) return true;
+        else if (isAttackedByKnight(kingIdx, color)) return true;
+        else return isAttackedByKing(kingIdx, color);
+    }
+
+    public boolean inCheck() {
+        byte kingIdx = getKingIdx();
+        if (isAttackedDiagonally(kingIdx, color)) return true;
+        else if (isAttackedOrthagonally(kingIdx, color)) return true;
+        else if (isAttackedByPawn(kingIdx, color)) return true;
+        else if (isAttackedByKnight(kingIdx, color)) return true;
+        else return isAttackedByKing(kingIdx, color);
     }
 
     public void computeMovesPseudoLegal() {
