@@ -133,7 +133,8 @@ public class Bot {
         }
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
-            nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+            if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
+            nextState = sortMoves ? state.getState(moveSearchOrder[i]) : state.makeMove(i);
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
@@ -178,7 +179,8 @@ public class Bot {
         int score;
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
-            nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+            if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
+            nextState = sortMoves ? state.getState(moveSearchOrder[i]) : state.makeMove(i);
             score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {

@@ -440,6 +440,11 @@ public class MutableGameState {
         undoMoveOnlyBoard(lastMutatingMove, lastMutatingPieceTaken);
     }
 
+    public void makeMoveOnlyBoard(int idx) {
+        lastMutatingMove = getMove(idx);
+        lastMutatingPieceTaken = makeMoveOnlyBoard(lastMutatingMove);
+    }
+
     public byte makeMoveOnlyBoard(byte[] move) {
         // Castle
         if (move[0] == -1) {

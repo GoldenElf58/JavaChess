@@ -33,59 +33,14 @@ public class TestBot {
         return score;
     }
 
-    public int getMove(GameState state, double allottedTime) {
-        return iterativeDeepening(state, allottedTime);
-    }
-
-    public int iterativeDeepening(GameState state, double allottedTime) {
-        Watch watch = new Watch();
-        watch.start();
-        final int[] depth = {1};
-        final int[] move = {0};
-        Thread thread = new Thread(() -> {
-        });
-        score = 0;
-        while (watch.getElapsedTimeMillis() / 1000d < allottedTime) {
-            if (!thread.isAlive()) {
-                if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
-                thread = new Thread(() -> {
-                    move[0] = minimaxMove(state.asMutable(), depth[0], state.isWhiteMove());
-                    depth[0]++;
-                });
-                thread.start();
-            }
-        }
-        thread.interrupt();
-        if (log) {
-            if (!new File("depths.txt").exists()) {
-                System.out.println("Creating file depths.txt");
-                try {
-                    if (!new File("depths.txt").createNewFile())
-                        System.out.println("Failed to create file depths.txt");
-                } catch (IOException e) {
-                    System.out.println("Failed to create file depths.txt");
-                }
-            }
-            try (PrintWriter writer = new PrintWriter(new FileWriter("depths.txt", true))) {
-                writer.println(depth[0]);
-            } catch (IOException e) {
-                System.out.println("Failed to append to file depths.txt");
-            }
-        }
-        System.out.println("Depth: " + depth[0]);
-        System.out.println("Score: " + score);
-        return move[0];
-    }
-
-    public int iterativeDeepening(GameState state, int maxDepth) {
+    public void iterativeDeepening(GameState state, int maxDepth) {
         Watch watch = new Watch();
         watch.start();
         int depth = 1;
-        int move = 0;
         score = 0;
         while (depth <= maxDepth) {
             if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
-            move = minimaxMove(state.asMutable(), depth, state.isWhiteMove());
+            minimaxMove(state.asMutable(), depth, state.isWhiteMove());
             depth++;
         }
         if (log) {
@@ -106,15 +61,13 @@ public class TestBot {
             System.out.println("Depth: " + depth);
             System.out.println("Score: " + score);
         }
-        return move;
     }
 
-    public int minimaxMove(MutableGameState state, int depth, boolean isMaximizing) {
+    public void minimaxMove(MutableGameState state, int depth, boolean isMaximizing) {
         assert depth > 0;
         state.computeMoves();
-        if (!state.isInProgress()) return -1;
+        if (!state.isInProgress()) return;
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
-        int bestMoveIdx = 0;
         int alpha = Integer.MIN_VALUE / 2;
         int beta = Integer.MAX_VALUE / 2;
 
@@ -133,18 +86,17 @@ public class TestBot {
         }
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
-            nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+            if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
+            nextState = sortMoves ? state.getState(moveSearchOrder[i]) : state.makeMove(i);
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
-                bestMoveIdx = sortMoves ? moveSearchOrder[i] : i;
                 if (isMaximizing) alpha = score;
                 else beta = score;
             }
         }
         this.score = bestScore;
-        return bestMoveIdx;
     }
 
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
@@ -178,7 +130,8 @@ public class TestBot {
         int score;
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
-            nextState = sortMoves ? state.makeMove(moveSearchOrder[i]) : state.makeMove(i);
+            if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
+            nextState = sortMoves ? state.getState(moveSearchOrder[i]) : state.makeMove(i);
             score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
