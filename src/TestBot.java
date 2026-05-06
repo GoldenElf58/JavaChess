@@ -89,7 +89,7 @@ public class TestBot {
             nextStates = null;
             moveSearchOrder = null;
         }
-        
+
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
