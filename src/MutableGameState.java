@@ -2,41 +2,41 @@ import static java.lang.Math.abs;
 
 public class MutableGameState {
 
-    private final byte[] board;
-    public final boolean whiteQueen;
-    public final boolean whiteKing;
-    public final boolean blackQueen;
-    public final boolean blackKing;
-    private final byte enPassantIdx;
-    private final int halfMoves;
-    private final byte halfMoveClock;
-    private final boolean whiteMove;
-    private final byte color;
-    private final PositionHistory positionHistory;
+    private byte[] board;
+    public boolean whiteQueen;
+    public boolean whiteKing;
+    public boolean blackQueen;
+    public boolean blackKing;
+    private byte enPassantIdx;
+    private int halfMoves;
+    private byte halfMoveClock;
+    private boolean whiteMove;
+    private byte color;
+    private PositionHistory positionHistory;
     private byte[] moves;
     private int moveCount = 0;
     private boolean movesGenerated = false;
     private boolean isWinner;
     private byte winner;
-    private final byte blackKnights;
-    private final byte whiteKnights;
-    private final byte blackBishops;
-    private final byte whiteBishops;
-    private final byte otherPieces;
-    private final long hash;
-    private final byte whiteKingSquare;
-    private final byte blackKingSquare;
-    public final ZobristHash zobrist;
+    private byte blackKnights;
+    private byte whiteKnights;
+    private byte blackBishops;
+    private byte whiteBishops;
+    private byte otherPieces;
+    private long hash;
+    private byte whiteKingSquare;
+    private byte blackKingSquare;
+    public ZobristHash zobrist;
     byte lastMutatingMoveIdx;
     byte lastMutatingPieceTaken;
-    private final boolean canEnPassant;
+    private boolean canEnPassant;
 
-    MutableGameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
-                     boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
-                     boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
-                     byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
-                     byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare,
-                     ZobristHash zobrist, boolean canEnPassant, long hash) {
+    private MutableGameState init(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
+                      boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
+                      boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
+                      byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
+                      byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare,
+                      ZobristHash zobrist, boolean canEnPassant, long hash) {
         this.board = board;
         this.whiteQueen = whiteQueen;
         this.whiteKing = whiteKing;
@@ -61,6 +61,19 @@ public class MutableGameState {
         this.positionHistory = positionHistory == null ? new PositionHistory(hash)
                 : positionHistory;
         this.canEnPassant = canEnPassant;
+        return this;
+    }
+
+    MutableGameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
+                     boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
+                     boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
+                     byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
+                     byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare,
+                     ZobristHash zobrist, boolean canEnPassant, long hash) {
+        init(board, whiteQueen, whiteKing, blackQueen, blackKing, enPassantIdx, halfMoves,
+                halfMoveClock, whiteMove, positionHistory, isWinner, winner, blackKnights,
+                whiteKnights, blackBishops, whiteBishops, otherPieces, whiteKingSquare,
+                blackKingSquare, zobrist, canEnPassant, hash);
     }
 
     public void computeMoves() {
@@ -430,6 +443,172 @@ public class MutableGameState {
         }
 
         return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null,
+                false, (byte) 0, blackKnights, whiteKnights, blackBishops,
+                whiteBishops, otherPieces, piece == 6 ? move_1 : whiteKingSquare,
+                piece == -6 ? move_1 : blackKingSquare, zobrist, false, hash);
+    }
+
+    public MutableGameState loadMoveTo(MutableGameState child, int moveIdx) {
+        int idx = moveIdx * 3;
+        lastMutatingMoveIdx = (byte) moveIdx;
+        return loadMoveTo(child, moves[idx], moves[idx + 1], moves[idx + 2]);
+    }
+
+    public MutableGameState loadMoveTo(MutableGameState child, byte move_0, byte move_1, byte move_2) {
+        byte[] newBoard = board;
+        boolean whiteQueen = this.whiteQueen;
+        boolean whiteKing = this.whiteKing;
+        boolean blackQueen = this.blackQueen;
+        boolean blackKing = this.blackKing;
+        byte blackKnights = this.blackKnights;
+        byte whiteKnights = this.whiteKnights;
+        byte whiteBishops = this.whiteBishops;
+        byte blackBishops = this.blackBishops;
+        byte otherPieces = this.otherPieces;
+
+        // Castle
+        if (move_0 == -1) {
+            newBoard[move_1 + move_2 * 2] = (byte) (6 * color);
+            newBoard[move_1 + move_2] = (byte) (4 * color);
+            newBoard[move_1] = 0;
+            newBoard[move_1 + (move_2 == 1 ? 3 : -4)] = 0;
+            if (whiteMove) {
+                whiteQueen = false;
+                whiteKing = false;
+            } else {
+                blackQueen = false;
+                blackKing = false;
+            }
+            lastMutatingPieceTaken = 0;
+            return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
+                    (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
+                    whiteMove ? (byte) (move_1 + move_2 * 2) : whiteKingSquare, !whiteMove ?
+                    (byte) (move_1 + move_2 * 2) : blackKingSquare, zobrist, false, zobrist.hash(
+                    newBoard, whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
+        }
+
+        // Promotion
+        if (move_0 == -2) {
+            newBoard[move_1 - 8 * color] = move_2;
+            otherPieces--;
+            if (move_2 == 2) whiteKnights++;
+            else if (move_2 == 3) whiteBishops++;
+            else if (move_2 == -2) blackKnights++;
+            else if (move_2 == -3) blackBishops++;
+            else otherPieces++;
+            newBoard[move_1] = 0;
+            lastMutatingPieceTaken = 0;
+            return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                    (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
+                    blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
+                    whiteKingSquare, blackKingSquare, zobrist, false, zobrist.hash(newBoard,
+                    whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
+        }
+
+        // En Passant
+        if (move_0 == -3) {
+            newBoard[move_1 - color * 8 + move_2] = color;
+            newBoard[move_1 + move_2] = 0;
+            newBoard[move_1] = 0;
+            lastMutatingPieceTaken = (byte) -color;
+            return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
+                    null, false, (byte) 0,
+                    blackKnights, whiteKnights, blackBishops,
+                    whiteBishops, (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare,
+                    zobrist, false, zobrist.hash(newBoard, whiteQueen, whiteKing, blackQueen,
+                    blackKing, !whiteMove));
+        }
+
+        // Promotion Taking
+        if (move_0 <= -4) {
+            lastMutatingPieceTaken = board[move_2];
+            newBoard[move_2] = (byte) ((-2 - move_0) * color);
+            newBoard[move_1] = 0;
+            otherPieces--;
+            if (board[move_2] == 2) whiteKnights--;
+            else if (board[move_2] == 3) whiteBishops--;
+            else if (board[move_2] == -2) blackKnights--;
+            else if (board[move_2] == -3) blackBishops--;
+            else otherPieces--;
+            if (move_0 == -4) {
+                if (color == 1) whiteKnights++;
+                else blackKnights++;
+            } else if (move_0 == -5) {
+                if (color == 1) whiteBishops++;
+                else blackBishops++;
+            } else otherPieces++;
+            return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
+                    (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops,
+                    (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare, zobrist, false,
+                    zobrist.hash(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                            !whiteMove));
+        }
+
+        byte piece = newBoard[move_0];
+        byte captured = newBoard[move_1];
+        lastMutatingPieceTaken = captured;
+        newBoard[move_0] = 0;
+        newBoard[move_1] = piece;
+        if (piece == -6) {
+            blackQueen = false;
+            blackKing = false;
+        } else if (piece == 6) {
+            whiteQueen = false;
+            whiteKing = false;
+        } else if (piece == -4) {
+            if (move_0 == 0) blackQueen = false;
+            else if (move_0 == 7) blackKing = false;
+        } else if (piece == 4) {
+            if (move_0 == 56) whiteQueen = false;
+            else if (move_0 == 63) whiteKing = false;
+        }
+
+        long hash;
+        hash = this.hash;
+        hash ^= zobrist.hash(move_0, piece);
+        hash ^= zobrist.hash(move_1, piece);
+        hash ^= zobrist.hash(this.whiteQueen ^ whiteQueen,
+                this.whiteKing ^ whiteKing,
+                this.blackQueen ^ blackQueen,
+                this.blackKing ^ blackKing, true);
+        if (captured != 0) {
+            hash ^= zobrist.hash(move_1, captured);
+            if (captured == -4) {
+                otherPieces--;
+                if (move_1 == 0) blackQueen = false;
+                else if (move_1 == 7) blackKing = false;
+            } else if (captured == 4) {
+                otherPieces--;
+                if (move_1 == 56) whiteQueen = false;
+                else if (move_1 == 63) whiteKing = false;
+            } else if (captured == 2) whiteKnights--;
+            else if (captured == 3) whiteBishops--;
+            else if (captured == -2) blackKnights--;
+            else if (captured == -3) blackBishops--;
+            else otherPieces--;
+        } else if ((piece == 1 || piece == -1) && abs(move_0 - move_1) == 16) {
+            return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
+                    move_1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
+                    blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
+                    whiteKingSquare, blackKingSquare, zobrist, true, hash);
+        }
+
+        byte halfMoveClock = piece == 1 || captured != 0 ? 0 : (byte) (this.halfMoveClock + 1);
+        if (halfMoveClock > 0) {
+            PositionHistory positionHistory = new PositionHistory(hash, this.positionHistory);
+            return child.init(newBoard, whiteQueen, whiteKing,
+                    blackQueen, blackKing, (byte) -1, halfMoves + 1, halfMoveClock,
+                    !whiteMove, positionHistory, positionHistory.count >= 3, (byte) 0,
+                    blackKnights, whiteKnights, blackBishops,
+                    whiteBishops, otherPieces, piece == 6 ? move_1 : whiteKingSquare,
+                    piece == -6 ? move_1 : blackKingSquare, zobrist, false, hash);
+        }
+
+        return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                 (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null,
                 false, (byte) 0, blackKnights, whiteKnights, blackBishops,
                 whiteBishops, otherPieces, piece == 6 ? move_1 : whiteKingSquare,

@@ -11,6 +11,7 @@ public class TestBot {
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
     private final boolean log;
     private final TTEntry emptyTT = new TTEntry();
+    private MutableGameState[][] pools = new MutableGameState[10][218];
 
     static class TTEntry {
         int score;
@@ -91,6 +92,7 @@ public class TestBot {
         }
 
         MutableGameState nextState;
+        if (depth > pools.length) pools = new MutableGameState[pools.length * 2][];
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
             nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
@@ -126,7 +128,8 @@ public class TestBot {
             nextStates = new MutableGameState[state.getMoveCount()];
             for (int i = 0; i < state.getMoveCount(); i++) {
                 moveSearchOrder[i] = i;
-                nextStates[i] = state.makeMove(i);
+                if (pools[depth][i] != null) nextStates[i] = state.loadMoveTo(pools[depth][i], i);
+                else nextStates[i] = pools[depth][i] = state.makeMove(i);
                 state.undoMove();
             }
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
@@ -141,8 +144,13 @@ public class TestBot {
         int score;
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
-            if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
-            nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
+            if (sortMoves) {
+                state.makeMoveOnlyBoard(moveSearchOrder[i]);
+                nextState = nextStates[moveSearchOrder[i]];
+            } else{
+                if (pools[depth][i] != null) nextState = state.loadMoveTo(pools[depth][i], i);
+                else pools[depth][i] = nextState = state.makeMove(i);
+            }
             score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
