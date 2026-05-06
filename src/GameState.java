@@ -746,9 +746,10 @@ public class GameState {
 
     public MutableGameState asMutable() {
         return new MutableGameState(board.clone(), whiteQueen, whiteKing, blackQueen, blackKing,
-                lastMove, halfMoves, halfMoveClock, whiteMove, positionHistory, isWinner, winner,
-                blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
-                whiteKingSquare, blackKingSquare, zobrist, false, getHash());
+                lastMove == null ? -1 : lastMove[1], halfMoves, halfMoveClock, whiteMove,
+                positionHistory, isWinner, winner, blackKnights, whiteKnights, blackBishops,
+                whiteBishops, otherPieces, whiteKingSquare, blackKingSquare, zobrist,
+                lastMove != null, getHash());
     }
 
     public String moveToString(int moveIdx) {

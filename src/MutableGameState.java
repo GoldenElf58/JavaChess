@@ -7,7 +7,7 @@ public class MutableGameState {
     public final boolean whiteKing;
     public final boolean blackQueen;
     public final boolean blackKing;
-    private final byte[] lastMove;
+    private final byte enPassantIdx;
     private final int halfMoves;
     private final byte halfMoveClock;
     private final boolean whiteMove;
@@ -27,12 +27,12 @@ public class MutableGameState {
     private final byte whiteKingSquare;
     private final byte blackKingSquare;
     public final ZobristHash zobrist;
-    byte[] lastMutatingMove;
+    byte lastMutatingMoveIdx;
     byte lastMutatingPieceTaken;
     private final boolean canEnPassant;
 
     MutableGameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
-                     boolean blackKing, byte[] lastMove, int halfMoves, byte halfMoveClock,
+                     boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
                      boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
                      byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
                      byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare,
@@ -42,7 +42,7 @@ public class MutableGameState {
         this.whiteKing = whiteKing;
         this.blackQueen = blackQueen;
         this.blackKing = blackKing;
-        this.lastMove = lastMove;
+        this.enPassantIdx = enPassantIdx;
         this.halfMoves = halfMoves;
         this.halfMoveClock = halfMoveClock;
         this.whiteMove = whiteMove;
@@ -70,19 +70,22 @@ public class MutableGameState {
         boolean illegal;
         byte[] newMoves = new byte[moveCount * 3];
         int newMoveCount = 0;
-        byte[] move;
+        int idx;
         byte currKingIdx = getKingIdx();
-        byte kingIdx;
+        byte kingIdx, move_0, move_1, move_2;
         boolean kingMoved;
         if (currKingIdx == -1) return;
         boolean inCheck = inCheckByNonSlidingPiece(currKingIdx, color);
         for (byte moveIdx = 0; moveIdx < moveCount; moveIdx++) {
-            move = getMove(moveIdx);
-            pieceTaken = makeMoveOnlyBoard(move);
+            idx = moveIdx * 3;
+            move_0 = moves[idx];
+            move_1 = moves[idx + 1];
+            move_2 = moves[idx + 2];
+            pieceTaken = makeMoveOnlyBoard(move_0, move_1, move_2);
             illegal = false;
-            if (move[0] == -1) {
-                byte throughIdx = (byte) (currKingIdx + move[2]);
-                kingIdx = (byte) (throughIdx + move[2]);
+            if (move_0 == -1) {
+                byte throughIdx = (byte) (currKingIdx + move_2);
+                kingIdx = (byte) (throughIdx + move_2);
                 if (isAttackedDiagonally(kingIdx, color) || isAttackedDiagonally(currKingIdx, color)
                         || isAttackedDiagonally(throughIdx, color)) illegal = true;
                 else if (isAttackedOrthagonally(kingIdx, color) ||
@@ -95,8 +98,8 @@ public class MutableGameState {
                 else if (isAttackedByKnight(kingIdx, color) || isAttackedByKnight(currKingIdx, color)
                         || isAttackedByKnight(throughIdx, color)) illegal = true;
             } else {
-                kingMoved = move[0] >= 0 && move[2] == 6;
-                kingIdx = kingMoved ? move[1] : currKingIdx;
+                kingMoved = move_0 >= 0 && move_2 == 6;
+                kingIdx = kingMoved ? move_1 : currKingIdx;
                 if (isAttackedDiagonally(kingIdx, color)) illegal = true;
                 else if (isAttackedOrthagonally(kingIdx, color)) illegal = true;
                 else if (kingMoved || inCheck) {
@@ -105,11 +108,11 @@ public class MutableGameState {
                     else if (isAttackedByKing(kingIdx, color)) illegal = true;
                 }
             }
-            undoMoveOnlyBoard(move, pieceTaken);
+            undoMoveOnlyBoard(move_0, move_1, move_2, pieceTaken);
             if (!illegal) {
-                newMoves[newMoveCount * 3] = move[0];
-                newMoves[newMoveCount * 3 + 1] = move[1];
-                newMoves[newMoveCount * 3 + 2] = move[2];
+                newMoves[newMoveCount * 3] = move_0;
+                newMoves[newMoveCount * 3 + 1] = move_1;
+                newMoves[newMoveCount * 3 + 2] = move_2;
                 newMoveCount++;
             }
         }
@@ -267,15 +270,13 @@ public class MutableGameState {
         return moveCount;
     }
 
-    public byte[] getMove(int moveIdx) {
-        return new byte[]{moves[moveIdx * 3], moves[moveIdx * 3 + 1], moves[moveIdx * 3 + 2]};
-    }
-
     public MutableGameState makeMove(int moveIdx) {
-        return makeMove(getMove(moveIdx));
+        int idx = moveIdx * 3;
+        lastMutatingMoveIdx = (byte) moveIdx;
+        return makeMove(moves[idx], moves[idx + 1], moves[idx + 2]);
     }
 
-    public MutableGameState makeMove(byte[] move) {
+    public MutableGameState makeMove(byte move_0, byte move_1, byte move_2) {
         byte[] newBoard = board;
         boolean whiteQueen = this.whiteQueen;
         boolean whiteKing = this.whiteKing;
@@ -286,15 +287,13 @@ public class MutableGameState {
         byte whiteBishops = this.whiteBishops;
         byte blackBishops = this.blackBishops;
         byte otherPieces = this.otherPieces;
-        byte move_0 = move[0], move_1 = move[1];
-        lastMutatingMove = move;
 
         // Castle
         if (move_0 == -1) {
-            newBoard[move_1 + move[2] * 2] = (byte) (6 * color);
-            newBoard[move_1 + move[2]] = (byte) (4 * color);
+            newBoard[move_1 + move_2 * 2] = (byte) (6 * color);
+            newBoard[move_1 + move_2] = (byte) (4 * color);
             newBoard[move_1] = 0;
-            newBoard[move_1 + (move[2] == 1 ? 3 : -4)] = 0;
+            newBoard[move_1 + (move_2 == 1 ? 3 : -4)] = 0;
             if (whiteMove) {
                 whiteQueen = false;
                 whiteKing = false;
@@ -304,26 +303,26 @@ public class MutableGameState {
             }
             lastMutatingPieceTaken = 0;
             return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    move, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
+                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
                     (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
-                    whiteMove ? (byte) (move_1 + move[2] * 2) : whiteKingSquare, !whiteMove ?
-                    (byte) (move_1 + move[2] * 2) : blackKingSquare, zobrist, false, zobrist.hash(
-                            newBoard, whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
+                    whiteMove ? (byte) (move_1 + move_2 * 2) : whiteKingSquare, !whiteMove ?
+                    (byte) (move_1 + move_2 * 2) : blackKingSquare, zobrist, false, zobrist.hash(
+                    newBoard, whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
         }
 
         // Promotion
         if (move_0 == -2) {
-            newBoard[move_1 - 8 * color] = move[2];
+            newBoard[move_1 - 8 * color] = move_2;
             otherPieces--;
-            if (move[2] == 2) whiteKnights++;
-            else if (move[2] == 3) whiteBishops++;
-            else if (move[2] == -2) blackKnights++;
-            else if (move[2] == -3) blackBishops++;
+            if (move_2 == 2) whiteKnights++;
+            else if (move_2 == 3) whiteBishops++;
+            else if (move_2 == -2) blackKnights++;
+            else if (move_2 == -3) blackBishops++;
             else otherPieces++;
             newBoard[move_1] = 0;
             lastMutatingPieceTaken = 0;
             return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    move, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
+                    (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
                     whiteKingSquare, blackKingSquare, zobrist, false, zobrist.hash(newBoard,
                     whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
@@ -331,12 +330,12 @@ public class MutableGameState {
 
         // En Passant
         if (move_0 == -3) {
-            newBoard[move_1 - color * 8 + move[2]] = color;
-            newBoard[move_1 + move[2]] = 0;
+            newBoard[move_1 - color * 8 + move_2] = color;
+            newBoard[move_1 + move_2] = 0;
             newBoard[move_1] = 0;
             lastMutatingPieceTaken = (byte) -color;
             return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    move, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
+                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
                     null, false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
                     whiteBishops, (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare,
@@ -346,14 +345,14 @@ public class MutableGameState {
 
         // Promotion Taking
         if (move_0 <= -4) {
-            lastMutatingPieceTaken = board[move[2]];
-            newBoard[move[2]] = (byte) ((-2 - move_0) * color);
+            lastMutatingPieceTaken = board[move_2];
+            newBoard[move_2] = (byte) ((-2 - move_0) * color);
             newBoard[move_1] = 0;
             otherPieces--;
-            if (board[move[2]] == 2) whiteKnights--;
-            else if (board[move[2]] == 3) whiteBishops--;
-            else if (board[move[2]] == -2) blackKnights--;
-            else if (board[move[2]] == -3) blackBishops--;
+            if (board[move_2] == 2) whiteKnights--;
+            else if (board[move_2] == 3) whiteBishops--;
+            else if (board[move_2] == -2) blackKnights--;
+            else if (board[move_2] == -3) blackBishops--;
             else otherPieces--;
             if (move_0 == -4) {
                 if (color == 1) whiteKnights++;
@@ -363,7 +362,7 @@ public class MutableGameState {
                 else blackBishops++;
             } else otherPieces++;
             return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    move, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
+                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
                     (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops,
                     (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare, zobrist, false,
                     zobrist.hash(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
@@ -414,7 +413,7 @@ public class MutableGameState {
             else otherPieces--;
         } else if ((piece == 1 || piece == -1) && abs(move_0 - move_1) == 16) {
             return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    move, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
+                    move_1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
                     whiteKingSquare, blackKingSquare, zobrist, true, hash);
         }
@@ -423,7 +422,7 @@ public class MutableGameState {
         if (halfMoveClock > 0) {
             PositionHistory positionHistory = new PositionHistory(hash, this.positionHistory);
             return new MutableGameState(newBoard, whiteQueen, whiteKing,
-                    blackQueen, blackKing, move, halfMoves + 1, halfMoveClock,
+                    blackQueen, blackKing, (byte) -1, halfMoves + 1, halfMoveClock,
                     !whiteMove, positionHistory, positionHistory.count >= 3, (byte) 0,
                     blackKnights, whiteKnights, blackBishops,
                     whiteBishops, otherPieces, piece == 6 ? move_1 : whiteKingSquare,
@@ -431,96 +430,97 @@ public class MutableGameState {
         }
 
         return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                move, halfMoves + 1, (byte) 0, !whiteMove, null,
+                (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null,
                 false, (byte) 0, blackKnights, whiteKnights, blackBishops,
                 whiteBishops, otherPieces, piece == 6 ? move_1 : whiteKingSquare,
                 piece == -6 ? move_1 : blackKingSquare, zobrist, false, hash);
     }
 
     public void undoMove() {
-        undoMoveOnlyBoard(lastMutatingMove, lastMutatingPieceTaken);
+        int idx = lastMutatingMoveIdx * 3;
+        undoMoveOnlyBoard(moves[idx], moves[idx + 1], moves[idx + 2], lastMutatingPieceTaken);
     }
 
-    public void makeMoveOnlyBoard(int idx) {
-        lastMutatingMove = getMove(idx);
-        lastMutatingPieceTaken = makeMoveOnlyBoard(lastMutatingMove);
+    public void makeMoveOnlyBoard(int moveIdx) {
+        int idx = moveIdx * 3;
+        lastMutatingMoveIdx = (byte) moveIdx;
+        lastMutatingPieceTaken = makeMoveOnlyBoard(moves[idx], moves[idx + 1], moves[idx + 2]);
     }
 
-    public byte makeMoveOnlyBoard(byte[] move) {
+    public byte makeMoveOnlyBoard(byte move_0, byte move_1, byte move_2) {
         // Castle
-        if (move[0] == -1) {
-            board[move[1] + move[2] * 2] = (byte) (6 * color);
-            board[move[1] + move[2]] = (byte) (4 * color);
-            board[move[1]] = 0;
-            board[move[1] + (move[2] == 1 ? 3 : -4)] = 0;
+        if (move_0 == -1) {
+            board[move_1 + move_2 * 2] = (byte) (6 * color);
+            board[move_1 + move_2] = (byte) (4 * color);
+            board[move_1] = 0;
+            board[move_1 + (move_2 == 1 ? 3 : -4)] = 0;
             return 0;
         }
 
         // Promotion
-        if (move[0] == -2) {
-            board[move[1] - 8 * color] = move[2];
-            board[move[1]] = 0;
+        if (move_0 == -2) {
+            board[move_1 - 8 * color] = move_2;
+            board[move_1] = 0;
             return 0;
         }
 
         // En Passant
-        if (move[0] == -3) {
-            board[move[1] - color * 8 + move[2]] = color;
-            board[move[1] + move[2]] = 0;
-            board[move[1]] = 0;
+        if (move_0 == -3) {
+            board[move_1 - color * 8 + move_2] = color;
+            board[move_1 + move_2] = 0;
+            board[move_1] = 0;
             return (byte) -color;
         }
 
         // Promotion Taking
-        if (move[0] <= -4) {
-            byte pieceTaken = board[move[2]];
-            board[move[2]] = (byte) (color * (-2 - move[0]));
-            board[move[1]] = 0;
+        if (move_0 <= -4) {
+            byte pieceTaken = board[move_2];
+            board[move_2] = (byte) (color * (-2 - move_0));
+            board[move_1] = 0;
             return pieceTaken;
         }
 
-        byte pieceTaken = board[move[1]];
-        board[move[1]] = board[move[0]];
-        board[move[0]] = 0;
+        byte pieceTaken = board[move_1];
+        board[move_1] = board[move_0];
+        board[move_0] = 0;
 
         return pieceTaken;
     }
 
-    public void undoMoveOnlyBoard(byte[] move, byte pieceTaken) {
+    public void undoMoveOnlyBoard(byte move_0, byte move_1, byte move_2, byte pieceTaken) {
         // Castle
-        if (move[0] == -1) {
-            byte move_1 = move[1];
-            board[move_1 + move[2] * 2] = 0;
-            board[move_1 + move[2]] = 0;
+        if (move_0 == -1) {
+            board[move_1 + move_2 * 2] = 0;
+            board[move_1 + move_2] = 0;
             board[move_1] = (byte) (6 * color);
-            board[move_1 + (move[2] == 1 ? 3 : -4)] = (byte) (4 * color);
+            board[move_1 + (move_2 == 1 ? 3 : -4)] = (byte) (4 * color);
             return;
         }
 
         // Promotion
-        if (move[0] == -2) {
-            board[move[1] - 8 * color] = 0;
-            board[move[1]] = color;
+        if (move_0 == -2) {
+            board[move_1 - 8 * color] = 0;
+            board[move_1] = color;
             return;
         }
 
         // En Passant
-        if (move[0] == -3) {
-            board[move[1] - color * 8 + move[2]] = 0;
-            board[move[1] + move[2]] = pieceTaken;
-            board[move[1]] = color;
+        if (move_0 == -3) {
+            board[move_1 - color * 8 + move_2] = 0;
+            board[move_1 + move_2] = pieceTaken;
+            board[move_1] = color;
             return;
         }
 
         // Promotion Taking
-        if (move[0] <= -4) {
-            board[move[2]] = pieceTaken;
-            board[move[1]] = color;
+        if (move_0 <= -4) {
+            board[move_2] = pieceTaken;
+            board[move_1] = color;
             return;
         }
 
-        board[move[0]] = board[move[1]];
-        board[move[1]] = pieceTaken;
+        board[move_0] = board[move_1];
+        board[move_1] = pieceTaken;
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
@@ -687,10 +687,10 @@ public class MutableGameState {
         }
 
         // En Passant
-        if (lastMove != null && canEnPassant) {
-            if ((lastMove[1] & 7) == (i & 7) - 1 && lastMove[1] == i - 1) { // Left
+        if (enPassantIdx != -1 && canEnPassant) {
+            if ((enPassantIdx & 7) == (i & 7) - 1 && enPassantIdx == i - 1) { // Left
                 addMoveSlot((byte) -3, i, (byte) -1);
-            } else if ((lastMove[1] & 7) == (i & 7) + 1 && lastMove[1] == i + 1) { // Right
+            } else if ((enPassantIdx & 7) == (i & 7) + 1 && enPassantIdx == i + 1) { // Right
                 addMoveSlot((byte) -3, i, (byte) 1);
             }
         }
