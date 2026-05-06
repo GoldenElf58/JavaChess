@@ -3,6 +3,7 @@ import java.util.Random;
 public class ZobristHash {
 
     private final long[][] zobristTable = new long[65][13];
+    private final long whiteQueen, whiteKing, blackQueen, blackKing, isWhiteMove;
 
     public ZobristHash() {
         Random random = new Random();
@@ -11,6 +12,11 @@ public class ZobristHash {
                 zobristTable[i][j] = random.nextLong();
             }
         }
+        whiteQueen = zobristTable[64][0];
+        whiteKing = zobristTable[64][1];
+        blackQueen = zobristTable[64][2];
+        blackKing = zobristTable[64][3];
+        isWhiteMove = zobristTable[64][4];
     }
 
     public long hash(int idx, byte piece) {
@@ -30,11 +36,11 @@ public class ZobristHash {
     public long hash(boolean whiteQueen, boolean whiteKing, boolean blackQueen,
                      boolean blackKing, boolean isWhiteMove) {
         long hash = 0;
-        if (whiteQueen) hash ^= zobristTable[64][1];
-        if (whiteKing) hash ^= zobristTable[64][0];
-        if (blackQueen) hash ^= zobristTable[64][3];
-        if (blackKing) hash ^= zobristTable[64][2];
-        if (isWhiteMove) hash ^= zobristTable[64][4];
+        if (whiteQueen) hash ^= this.whiteQueen;
+        if (whiteKing) hash ^= this.whiteKing;
+        if (blackQueen) hash ^= this.blackQueen;
+        if (blackKing) hash ^= this.blackKing;
+        if (isWhiteMove) hash ^= this.isWhiteMove;
         return hash;
     }
 

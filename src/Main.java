@@ -81,7 +81,7 @@ public class Main extends Application {
     private static final int warmup = N / 10;
     private static final int maxDepth = 3;
     private static final boolean useBot1 = true;
-    private static final boolean useTestBot = true;
+    private static final boolean useTestBot = false;
 
     private final Bot bot = new Bot(true);
 
