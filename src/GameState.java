@@ -51,7 +51,7 @@ public class GameState {
         halfMoveClock = 0;
         whiteMove = true;
         color = 1;
-        positionHistory = new PositionHistory(zobrist.hash(board));
+        positionHistory = new PositionHistory(zobrist.hash(this));
         isWinner = false;
         winner = 0;
         blackKnights = 2;
@@ -739,14 +739,16 @@ public class GameState {
     }
 
     public long getHash() {
-        return hashSaved ? hash : (hash = zobrist.hash(this));
+        if (hashSaved) return hash;
+        hashSaved = true;
+        return hash = zobrist.hash(this);
     }
 
     public MutableGameState asMutable() {
         return new MutableGameState(board.clone(), whiteQueen, whiteKing, blackQueen, blackKing,
                 lastMove, halfMoves, halfMoveClock, whiteMove, positionHistory, isWinner, winner,
                 blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
-                whiteKingSquare, blackKingSquare, zobrist, false);
+                whiteKingSquare, blackKingSquare, zobrist, false, getHash());
     }
 
     public String moveToString(int moveIdx) {

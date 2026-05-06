@@ -13,34 +13,38 @@ public class ZobristHash {
         }
     }
 
+    public long hash(int idx, byte piece) {
+        return zobristTable[idx][piece + 6];
+    }
+
     public long hash(byte[] board) {
         long hash = 0;
         for (int i = 0; i < 64; i++) {
-            int piece = board[i];
+            byte piece = board[i];
             if (piece == 0) continue;
-            hash ^= zobristTable[i][piece + 6];
+            hash ^= hash(i, piece);
         }
         return hash;
     }
 
-    public long hash(byte[] board, boolean whiteKing, boolean whiteQueen, boolean blackKing,
-                     boolean blackQueen, boolean isWhiteMove) {
-        long hash = hash(board);
-        if (whiteKing) hash ^= zobristTable[64][0];
+    public long hash(boolean whiteQueen, boolean whiteKing, boolean blackQueen,
+                     boolean blackKing, boolean isWhiteMove) {
+        long hash = 0;
         if (whiteQueen) hash ^= zobristTable[64][1];
-        if (blackKing) hash ^= zobristTable[64][2];
+        if (whiteKing) hash ^= zobristTable[64][0];
         if (blackQueen) hash ^= zobristTable[64][3];
+        if (blackKing) hash ^= zobristTable[64][2];
         if (isWhiteMove) hash ^= zobristTable[64][4];
         return hash;
     }
 
-    public long hash(GameState state) {
-        return hash(state.getBoard(), state.whiteKing, state.whiteQueen, state.blackKing,
-                state.blackQueen, state.isWhiteMove());
+    public long hash(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
+                     boolean blackKing, boolean isWhiteMove) {
+        return hash(board) ^ hash(whiteQueen, whiteKing, blackQueen, blackKing, isWhiteMove);
     }
 
-    public long hash(MutableGameState state) {
-        return hash(state.getBoard(), state.whiteKing, state.whiteQueen, state.blackKing,
-                state.blackQueen, state.isWhiteMove());
+    public long hash(GameState state) {
+        return hash(state.getBoard(), state.whiteQueen, state.whiteKing, state.blackQueen,
+                state.blackKing, state.isWhiteMove());
     }
 }

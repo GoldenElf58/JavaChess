@@ -118,23 +118,29 @@ public class Bot {
         int alpha = Integer.MIN_VALUE / 2;
         int beta = Integer.MAX_VALUE / 2;
 
-        Integer[] moveSearchOrder = new Integer[state.getMoveCount()];
-        boolean sortMoves = depth > 2;
+        final Integer[] moveSearchOrder;
+        final MutableGameState[] nextStates;
+        final boolean sortMoves = depth > 2;
         if (sortMoves) {
+            moveSearchOrder = new Integer[state.getMoveCount()];
+            nextStates = new MutableGameState[state.getMoveCount()];
             for (int i = 0; i < state.getMoveCount(); i++) {
                 moveSearchOrder[i] = i;
-                state.saveState(i, state.makeMove(i));
-                state.getState(i).getHash();
+                nextStates[i] = state.makeMove(i);
                 state.undoMove();
             }
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.getOrDefault(state.getState(m1).getHash(), emptyTT).score
-                            - moveCache.getOrDefault(state.getState(m2).getHash(), emptyTT).score));
+                    (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
+                            - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
+        } else {
+            nextStates = null;
+            moveSearchOrder = null;
         }
+
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
-            nextState = sortMoves ? state.getState(moveSearchOrder[i]) : state.makeMove(i);
+            nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
@@ -161,18 +167,23 @@ public class Bot {
         state.computeMoves();
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
 
-        Integer[] moveSearchOrder = new Integer[state.getMoveCount()];
-        boolean sortMoves = maxDepth - depth > 2;
+        final Integer[] moveSearchOrder;
+        final MutableGameState[] nextStates;
+        final boolean sortMoves = maxDepth - depth > 2;
         if (sortMoves) {
+            moveSearchOrder = new Integer[state.getMoveCount()];
+            nextStates = new MutableGameState[state.getMoveCount()];
             for (int i = 0; i < state.getMoveCount(); i++) {
                 moveSearchOrder[i] = i;
-                state.saveState(i, state.makeMove(i));
-                state.getState(i).getHash();
+                nextStates[i] = state.makeMove(i);
                 state.undoMove();
             }
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
-                    (moveCache.getOrDefault(state.getState(m1).getHash(), emptyTT).score
-                            - moveCache.getOrDefault(state.getState(m2).getHash(), emptyTT).score));
+                    (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
+                            - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
+        } else {
+            nextStates = null;
+            moveSearchOrder = null;
         }
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
@@ -180,7 +191,7 @@ public class Bot {
         MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
-            nextState = sortMoves ? state.getState(moveSearchOrder[i]) : state.makeMove(i);
+            nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
             score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {

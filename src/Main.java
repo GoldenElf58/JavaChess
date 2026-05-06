@@ -77,6 +77,11 @@ public class Main extends Application {
     private static final boolean whitePlayerHuman = true;
     private static final boolean blackPlayerHuman = false;
     private static final double allottedTime = 1.0;
+    private static final int N = 50;
+    private static final int warmup = N / 10;
+    private static final int maxDepth = 3;
+    private static final boolean useBot1 = true;
+    private static final boolean useTestBot = true;
 
     private final Bot bot = new Bot(true);
 
@@ -119,16 +124,11 @@ public class Main extends Application {
     }
 
     private static void runBenchmark() {
-        runBenchmark(true, false);
+        runBenchmark(false, false);
     }
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        int N = 50;
-        int warmup = N / 10;
-        int maxDepth = 3;
-        boolean useBot1 = true;
-        boolean useTestBot = false;
         double lastUpdate = 0;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
@@ -140,6 +140,32 @@ public class Main extends Application {
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
+        if (maxDepth > 3) {
+            for (int i = 0; i < warmup * 3; i++) {
+                gameState = new GameState();
+                gameState.computeMoves();
+                int movesThisGame = 0;
+                while (gameState.isInProgress()) {
+                    movesThisGame++;
+                    int move = random.nextInt(gameState.getMoveCount());
+                    oldWatch.start();
+                    if (useBot1) move = bot1.iterativeDeepening(gameState, 3);
+                    oldWatch.stop();
+                    newWatch.start();
+                    if (useTestBot) bot2.iterativeDeepening(gameState, 3);
+                    newWatch.stop();
+                    gameState = gameState.makeMove(move);
+                    gameState.computeMoves();
+                    if (debug) {
+                        if (verbose) {
+                            System.out.println(gameState);
+                            gameState.printMoves();
+                        }
+                        System.out.printf("Half moves: %,d%n", movesThisGame);
+                    }
+                }
+            }
+        }
         for (int i = 0; i < N + warmup; i++) {
             gameState = new GameState();
             gameState.computeMoves();
@@ -160,7 +186,7 @@ public class Main extends Application {
                         System.out.println(gameState);
                         gameState.printMoves();
                     }
-//                    System.out.printf("Half moves: %,d%n", movesThisGame);
+                    System.out.printf("Half moves: %,d%n", movesThisGame);
                 }
             }
             double progress = ((double) (i + 1) / (N + warmup)) * 100;
