@@ -33,11 +33,11 @@ public class MutableGameState {
     private boolean canEnPassant;
 
     private MutableGameState init(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
-                      boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
-                      boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
-                      byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
-                      byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare,
-                      ZobristHash zobrist, boolean canEnPassant, long hash) {
+                                  boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
+                                  boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
+                                  byte winner, byte blackKnights, byte whiteKnights, byte blackBishops,
+                                  byte whiteBishops, byte otherPieces, byte whiteKingSquare, byte blackKingSquare,
+                                  ZobristHash zobrist, boolean canEnPassant, long hash) {
         this.board = board;
         this.whiteQueen = whiteQueen;
         this.whiteKing = whiteKing;
@@ -59,8 +59,9 @@ public class MutableGameState {
         this.blackKingSquare = blackKingSquare;
         this.zobrist = zobrist;
         this.hash = hash;
-        this.positionHistory = positionHistory == null ? new PositionHistory(hash)
-                : positionHistory;
+        this.positionHistory = positionHistory == null ?
+                this.positionHistory == null ? new PositionHistory(hash) :
+                this.positionHistory.init(hash) : positionHistory;
         this.canEnPassant = canEnPassant;
         this.moveCount = 0;
         this.movesGenerated = false;
@@ -492,8 +493,8 @@ public class MutableGameState {
                     (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
                     (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
                     whiteMove ? (byte) (move_1 + move_2 * 2) : whiteKingSquare, !whiteMove ?
-                    (byte) (move_1 + move_2 * 2) : blackKingSquare, zobrist, false, zobrist.hash(
-                    newBoard, whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
+                            (byte) (move_1 + move_2 * 2) : blackKingSquare, zobrist, false, zobrist.hash(
+                            newBoard, whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
         }
 
         // Promotion
@@ -511,7 +512,7 @@ public class MutableGameState {
                     (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
                     blackKnights, whiteKnights, blackBishops, whiteBishops, otherPieces,
                     whiteKingSquare, blackKingSquare, zobrist, false, zobrist.hash(newBoard,
-                    whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
+                            whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove));
         }
 
         // En Passant
@@ -526,7 +527,7 @@ public class MutableGameState {
                     blackKnights, whiteKnights, blackBishops,
                     whiteBishops, (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare,
                     zobrist, false, zobrist.hash(newBoard, whiteQueen, whiteKing, blackQueen,
-                    blackKing, !whiteMove));
+                            blackKing, !whiteMove));
         }
 
         // Promotion Taking
@@ -606,7 +607,9 @@ public class MutableGameState {
 
         byte halfMoveClock = piece == 1 || captured != 0 ? 0 : (byte) (this.halfMoveClock + 1);
         if (halfMoveClock > 0) {
-            PositionHistory positionHistory = new PositionHistory(hash, this.positionHistory);
+            PositionHistory positionHistory = child.positionHistory == null ?
+                    new PositionHistory(hash, this.positionHistory) :
+                    child.positionHistory.init(hash, this.positionHistory);
             return child.init(newBoard, whiteQueen, whiteKing,
                     blackQueen, blackKing, (byte) -1, halfMoves + 1, halfMoveClock,
                     !whiteMove, positionHistory, positionHistory.count >= 3, (byte) 0,

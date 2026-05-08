@@ -161,7 +161,7 @@ public class Bot {
         }
 
         MutableGameState nextState;
-        if (depth > pools.length) pools = new MutableGameState[pools.length * 2][];
+        if (depth > pools.length) pools = new MutableGameState[pools.length * 2][218];
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
             nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);

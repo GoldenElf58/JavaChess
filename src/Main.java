@@ -79,7 +79,7 @@ public class Main extends Application {
     private static final double allottedTime = 1.0;
     private static final int N = 50;
     private static final int warmup = N / 10;
-    private static final int maxDepth = 3;
+    private static final int maxDepth = 4;
     private static final boolean useBot1 = true;
     private static final boolean useTestBot = false;
 
