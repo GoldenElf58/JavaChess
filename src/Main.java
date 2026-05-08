@@ -129,7 +129,8 @@ public class Main extends Application {
 
     private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
-        double lastUpdate = 0;
+        double lastUpdate = -1;
+        long lastTime = -1;
         long totalHalfMoves = 0;
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
@@ -140,6 +141,8 @@ public class Main extends Application {
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
         Watch newWatch = new Watch();
+        int totalBars = 20;
+        System.out.printf("\r0%% [%s] [0s]", "░".repeat(totalBars));
         if (maxDepth > 3) {
             for (int i = 0; i < warmup * 3; i++) {
                 gameState = new GameState();
@@ -149,7 +152,7 @@ public class Main extends Application {
                     movesThisGame++;
                     int move = random.nextInt(gameState.getMoveCount());
                     oldWatch.start();
-                    if (useBot1) move = bot1.iterativeDeepening(gameState, 3);
+                    if (useBot1) bot1.iterativeDeepening(gameState, 3);
                     oldWatch.stop();
                     newWatch.start();
                     if (useTestBot) bot2.iterativeDeepening(gameState, 3);
@@ -164,9 +167,12 @@ public class Main extends Application {
                         System.out.printf("Half moves: %,d%n", movesThisGame);
                     }
                 }
+                bot1.clearCache();
+                bot2.clearCache();
             }
         }
         for (int i = 0; i < N + warmup; i++) {
+            if (i == warmup) watch.start();
             gameState = new GameState();
             gameState.computeMoves();
             int movesThisGame = 0;
@@ -190,16 +196,16 @@ public class Main extends Application {
                 }
             }
             double progress = ((double) (i + 1) / (N + warmup)) * 100;
-            if (progress - lastUpdate >= 1) {
-                int totalBars = 20;
+            long time = watch.getElapsedTimeSeconds();
+            if (progress - lastUpdate >= 1 || lastTime - time >= 1) {
                 int filledBars = (int) (progress / 100 * totalBars);
                 String bar = "█".repeat(filledBars) + "░".repeat(totalBars - filledBars);
-                System.out.printf("\r%.0f%% [%s] [%ss]", progress, bar, watch.getElapsedTimeSeconds());
+                lastTime = time;
+                System.out.printf("\r%.0f%% [%s] [%ss]", progress, bar, lastTime);
                 lastUpdate = (int) progress;
             }
             bot1.clearCache();
             bot2.clearCache();
-            if (i + 1 == warmup) watch.start();
             if (i >= warmup) {
                 oldTimes[i - warmup] = oldWatch.getElapsedTimeNanos();
                 newTimes[i - warmup] = newWatch.getElapsedTimeNanos();
@@ -227,8 +233,7 @@ public class Main extends Application {
         System.out.printf("Time: %s%n", time(watch.getElapsedTimeNanos()));
         System.out.printf("Average time per half-move: %s%n",
                 time(watch.getElapsedTimeNanos() / totalHalfMoves));
-        System.out.printf("Average time per game: %s%n",
-                time(watch.getElapsedTimeNanos() / N));
+        System.out.printf("Average time per game: %s%n", time(watch.getElapsedTimeNanos() / N));
 
         double mean = totalHalfMoves / (double) N;
         double[] ci = confidenceInterval95(perGame);
@@ -283,7 +288,8 @@ public class Main extends Application {
         Group root = new Group();
         pencilMarkings = new Group();
         scene = new Scene(root, 720, 480, Color.grayRgb(0));
-        pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT, Color.TRANSPARENT);
+        pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT,
+                Color.TRANSPARENT);
 
         SoundHandler.loadSounds();
 
@@ -334,8 +340,8 @@ public class Main extends Application {
                 case 0 -> "Draw";
                 case 1 -> "White wins";
                 case -1 -> "Black wins";
-                default ->
-                        throw new IllegalStateException("Unexpected value: " + gameState.getWinner());
+                default -> throw
+                        new IllegalStateException("Unexpected value: " + gameState.getWinner());
             }));
             shown = true;
         }
@@ -554,7 +560,8 @@ public class Main extends Application {
                         .setArrowHeadSize(length * ARROW_HEAD_RATIO);
                 children.get(children.size() - 2).setOpacity(1);
             } else if (children.getLast() instanceof Circle &&
-                    ((Circle) children.getLast()).getStrokeWidth() == length * CIRCLE_RING_SMALL_RATIO) {
+                    ((Circle) children.getLast()).getStrokeWidth() ==
+                            length * CIRCLE_RING_SMALL_RATIO) {
                 ((Circle) children.getLast()).setStrokeWidth(length * CIRCLE_RING_RATIO);
                 children.getLast().setOpacity(1);
             }

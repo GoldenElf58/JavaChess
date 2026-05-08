@@ -12,10 +12,17 @@ public class Bot {
     private final boolean log;
     private final TTEntry emptyTT = new TTEntry();
     private MutableGameState[][] pools = new MutableGameState[10][218];
+    private volatile boolean stopSearch = false;
 
     static class TTEntry {
         int score;
         int depthRemaining;
+    }
+
+    static class StopSearchException extends RuntimeException {
+        public StopSearchException() {
+            super("StopSearchException");
+        }
     }
 
     public Bot(boolean log) {
@@ -41,22 +48,34 @@ public class Bot {
     public int iterativeDeepening(GameState state, double allottedTime) {
         Watch watch = new Watch();
         watch.start();
+        clearCache();
+        stopSearch = false;
         final int[] depth = {1};
         final int[] move = {0};
         Thread thread = new Thread(() -> {
         });
         score = 0;
+        pools = new MutableGameState[10][218];
         while (watch.getElapsedTimeMillis() / 1000d < allottedTime) {
             if (!thread.isAlive()) {
                 if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
                 thread = new Thread(() -> {
-                    move[0] = minimaxMove(state.asMutable(), depth[0], state.isWhiteMove());
-                    depth[0]++;
+                    try {
+                        pools = new MutableGameState[10][218];
+                        move[0] = minimaxMove(state.asMutable(), depth[0], state.isWhiteMove());
+                        depth[0]++;
+                    } catch (StopSearchException _) {
+                    }
                 });
                 thread.start();
             }
         }
-        thread.interrupt();
+        stopSearch = true;
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            thread.interrupt();
+        }
         if (log) {
             if (!new File("depths.txt").exists()) {
                 System.out.println("Creating file depths.txt");
@@ -75,12 +94,15 @@ public class Bot {
         }
         System.out.println("Depth: " + depth[0]);
         System.out.println("Score: " + score);
+        System.out.println("Time: " + watch.getElapsedTimeMillis() / 1000d + "s");
         return move[0];
     }
 
     public int iterativeDeepening(GameState state, int maxDepth) {
         Watch watch = new Watch();
         watch.start();
+        stopSearch = false;
+        clearCache();
         int depth = 1;
         int move = 0;
         score = 0;
@@ -158,6 +180,7 @@ public class Bot {
 
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
+        if (stopSearch) throw new StopSearchException();
         if (depth == maxDepth) return evaluate(state);
         long hashKey = state.getHash();
         TTEntry thisEntry;
@@ -196,7 +219,7 @@ public class Bot {
             if (sortMoves) {
                 state.makeMoveOnlyBoard(moveSearchOrder[i]);
                 nextState = nextStates[moveSearchOrder[i]];
-            } else{
+            } else {
                 if (pools[depth][i] != null) nextState = state.loadMoveTo(pools[depth][i], i);
                 else pools[depth][i] = nextState = state.makeMove(i);
             }

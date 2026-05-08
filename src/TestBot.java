@@ -37,6 +37,7 @@ public class TestBot {
     public void iterativeDeepening(GameState state, int maxDepth) {
         Watch watch = new Watch();
         watch.start();
+        clearCache();
         int depth = 1;
         score = 0;
         while (depth <= maxDepth) {

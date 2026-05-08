@@ -14,8 +14,9 @@ public class MutableGameState {
     private byte color;
     private PositionHistory positionHistory;
     private byte[] moves;
-    private int moveCount = 0;
-    private boolean movesGenerated = false;
+    private byte[] newMoves;
+    private int moveCount;
+    private boolean movesGenerated;
     private boolean isWinner;
     private byte winner;
     private byte blackKnights;
@@ -61,6 +62,10 @@ public class MutableGameState {
         this.positionHistory = positionHistory == null ? new PositionHistory(hash)
                 : positionHistory;
         this.canEnPassant = canEnPassant;
+        this.moveCount = 0;
+        this.movesGenerated = false;
+        this.lastMutatingMoveIdx = -1;
+        this.lastMutatingPieceTaken = -1;
         return this;
     }
 
@@ -77,11 +82,11 @@ public class MutableGameState {
     }
 
     public void computeMoves() {
-        if (moveCount != 0) return;
+        if (movesGenerated) return;
         computeMovesPseudoLegal();
         byte pieceTaken;
         boolean illegal;
-        byte[] newMoves = new byte[moveCount * 3];
+        if (newMoves == null) newMoves = new byte[654];
         int newMoveCount = 0;
         int idx;
         byte currKingIdx = getKingIdx();
@@ -111,7 +116,7 @@ public class MutableGameState {
                 else if (isAttackedByKnight(kingIdx, color) || isAttackedByKnight(currKingIdx, color)
                         || isAttackedByKnight(throughIdx, color)) illegal = true;
             } else {
-                kingMoved = move_0 >= 0 && move_2 == 6;
+                kingMoved = move_0 >= 0 && abs(board[move_1]) == 6;
                 kingIdx = kingMoved ? move_1 : currKingIdx;
                 if (isAttackedDiagonally(kingIdx, color)) illegal = true;
                 else if (isAttackedOrthagonally(kingIdx, color)) illegal = true;
@@ -129,7 +134,9 @@ public class MutableGameState {
                 newMoveCount++;
             }
         }
+        byte[] tmp = moves;
         moves = newMoves;
+        newMoves = tmp;
         movesGenerated = true;
         moveCount = newMoveCount;
     }
@@ -746,7 +753,7 @@ public class MutableGameState {
                 byte destination = (byte) (i + j * 8 + k);
                 if (idxMod8 + k == (destination & 7) && 0 <= destination && destination < 64 &&
                         board[destination] * color <= 0) {
-                    addMoveSlot(i, destination, (byte) 6);
+                    addMoveSlot(i, destination);
                 }
             }
         }
