@@ -38,6 +38,7 @@ public class GameState {
     private final byte whiteKingSquare;
     private final byte blackKingSquare;
     private final ZobristHash zobrist;
+    private static final byte[] bishopDirs = {9, -9, 7, -7};
 
     GameState() {
         zobrist = new ZobristHash();
@@ -113,11 +114,8 @@ public class GameState {
             if (move[0] == -1) {
                 byte throughIdx = (byte) (currKingIdx + move[2]);
                 kingIdx = (byte) (throughIdx + move[2]);
-                if (isAttackedDiagonally(kingIdx, color) || isAttackedDiagonally(currKingIdx, color)
-                        || isAttackedDiagonally(throughIdx, color)) illegal = true;
-                else if (isAttackedOrthagonally(kingIdx, color) ||
-                        isAttackedOrthagonally(currKingIdx, color) ||
-                        isAttackedOrthagonally(throughIdx, color)) illegal = true;
+                if (isAttackedSliding(kingIdx, color) || isAttackedSliding(currKingIdx, color)
+                        || isAttackedSliding(throughIdx, color)) illegal = true;
                 else if (isAttackedByPawn(kingIdx, color) || isAttackedByPawn(currKingIdx, color)
                         || isAttackedByPawn(throughIdx, color)) illegal = true;
                 else if (isAttackedByKing(kingIdx, color) || isAttackedByKing(currKingIdx, color)
@@ -127,8 +125,7 @@ public class GameState {
             } else {
                 kingMoved = move[0] >= 0 && move[2] == 6;
                 kingIdx = kingMoved ? move[1] : currKingIdx;
-                if (isAttackedDiagonally(kingIdx, color)) illegal = true;
-                else if (isAttackedOrthagonally(kingIdx, color)) illegal = true;
+                if (isAttackedSliding(kingIdx, color)) illegal = true;
                 else if (kingMoved || inCheck) {
                     if (isAttackedByPawn(kingIdx, color)) illegal = true;
                     else if (isAttackedByKnight(kingIdx, color)) illegal = true;
@@ -148,47 +145,44 @@ public class GameState {
         moveCount = newMoveCount;
     }
 
-    private boolean isAttackedDiagonally(byte kingIdx, byte color) {
-        byte kingMod8 = (byte) (kingIdx & 7);
-        byte kingDiv8 = (byte) (kingIdx / 8);
+    private boolean isAttackedSliding(byte kingIdx, byte color) {
         byte piece, target;
-        for (byte d1 = -1; d1 <= 1; d1 += 2) {
-            for (byte d2 = -1; d2 <= 1; d2 += 2) {
-                for (byte j = 1; j < 8; j++) {
-                    target = (byte) (kingIdx + d1 * j + d2 * j * 8);
-                    if (!((target & 7) == kingMod8 + d1 * j && target / 8 == kingDiv8 + d2 * j))
-                        break;
-                    if (target < 0 || target > 63) break;
-                    piece = board[target];
-                    if (piece == -3 * color || piece == -5 * color) return true;
-                    if (piece != 0) break;
-                }
-            }
+        target = kingIdx;
+        piece = 0;
+        while (piece == 0 && target / 8 != 0) {
+            target -= 8;
+            piece = board[target];
+            if (piece == -4 * color || piece == -5 * color) return true;
         }
-        return false;
-    }
-
-    private boolean isAttackedOrthagonally(byte kingIdx, byte color) {
-        byte kingMod8 = (byte) (kingIdx & 7);
-        byte kingDiv8 = (byte) (kingIdx / 8);
-        byte piece, target;
-        for (byte d1 = -1; d1 <= 1; d1 += 2) {
-            for (byte j = 1; j < 8; j++) {
-                target = (byte) (kingIdx + d1 * j);
-                if (!((target & 7) == kingMod8 + d1 * j && target / 8 == kingDiv8)) break;
-                piece = board[target];
-                if (piece == -4 * color || piece == -5 * color) return true;
-                if (piece != 0) break;
-            }
+        target = kingIdx;
+        piece = 0;
+        while (piece == 0 && target / 8 != 7) {
+            target += 8;
+            piece = board[target];
+            if (piece == -4 * color || piece == -5 * color) return true;
         }
-        for (byte d2 = -1; d2 <= 1; d2 += 2) {
-            for (byte j = 1; j < 8; j++) {
-                target = (byte) (kingIdx + d2 * j * 8);
-                if (!((target & 7) == kingMod8 && target / 8 == kingDiv8 + d2 * j)) break;
+        target = kingIdx;
+        piece = 0;
+        while (piece == 0 && target % 8 != 0) {
+            target -= 1;
+            piece = board[target];
+            if (piece == -4 * color || piece == -5 * color) return true;
+        }
+        target = kingIdx;
+        piece = 0;
+        while (piece == 0 && target % 8 != 7) {
+            target += 1;
+            piece = board[target];
+            if (piece == -4 * color || piece == -5 * color) return true;
+        }
+        for (byte dir : bishopDirs) {
+            target = kingIdx;
+            piece = 0;
+            while (piece == 0 && abs((target + dir) % 8 - target % 8) == 1) {
+                target += dir;
                 if (target < 0 || target > 63) break;
                 piece = board[target];
-                if (piece == -4 * color || piece == -5 * color) return true;
-                if (piece != 0) break;
+                if (piece == -3 * color || piece == -5 * color) return true;
             }
         }
         return false;
@@ -243,8 +237,7 @@ public class GameState {
 
     public boolean inCheck() {
         byte kingIdx = getKingIdx();
-        if (isAttackedDiagonally(kingIdx, color)) return true;
-        else if (isAttackedOrthagonally(kingIdx, color)) return true;
+        if (isAttackedSliding(kingIdx, color)) return true;
         else if (isAttackedByPawn(kingIdx, color)) return true;
         else if (isAttackedByKnight(kingIdx, color)) return true;
         else return isAttackedByKing(kingIdx, color);
@@ -483,7 +476,7 @@ public class GameState {
         // Promotion Taking
         if (move[0] <= -4) {
             byte pieceTaken = board[move[2]];
-            board[move[2]] = (byte) (-2 - move[0]);
+            board[move[2]] = (byte) (color * (-2 - move[0]));
             board[move[1]] = 0;
             return pieceTaken;
         }
