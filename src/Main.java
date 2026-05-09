@@ -63,6 +63,8 @@ public class Main extends Application {
     private final double[] mousePose = {-1, -1};
     private int specialStartSquare = -1;
     private int selectedSquare = -1;
+    private int fromSquare = -1;
+    private int toSquare = -1;
     private boolean dragging = true;
     private boolean firstSelection = false;
     private boolean shown = false;
@@ -73,11 +75,11 @@ public class Main extends Application {
     // ==============================
     // Parameters
     // ==============================
-    private static final boolean runBenchmarkOnly = true;
+    private static final boolean runBenchmarkOnly = false;
     private static final boolean whitePlayerHuman = true;
     private static final boolean blackPlayerHuman = false;
-    private static final double allottedTime = 1.0;
-    private static final int N = 50;
+    private static final double allottedTime = 1.5;
+    private static final int N = 15;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
     private static final boolean useBot1 = true;
@@ -144,7 +146,7 @@ public class Main extends Application {
         int totalBars = 20;
         System.out.printf("\r0%% [%s] [0s]", "░".repeat(totalBars));
         if (maxDepth > 3) {
-            for (int i = 0; i < warmup * 3; i++) {
+            for (int i = 0; i < (warmup + 1) * maxDepth; i++) {
                 gameState = new GameState();
                 gameState.computeMoves();
                 int movesThisGame = 0;
@@ -388,6 +390,7 @@ public class Main extends Application {
         gameState = gameStateHistory.removeLast();
         moveFuture.add(moveHistory.removeLast());
         gameState.computeMoves();
+        setMoveSquares(moveHistory.isEmpty() ? null : moveHistory.getLast());
     }
 
     private void redo() {
@@ -400,6 +403,7 @@ public class Main extends Application {
         gameState = gameStateFuture.removeLast();
         moveHistory.add(moveFuture.removeLast());
         gameState.computeMoves();
+        setMoveSquares(moveHistory.isEmpty() ? null : moveHistory.getLast());
     }
 
     private void initializeNodes(Group root) {
@@ -606,7 +610,38 @@ public class Main extends Application {
         makeMove(gameState.getMove(moveIdx));
     }
 
+    private void setMoveSquares(byte[] move) {
+        if (move == null) {
+            fromSquare = -1;
+            toSquare = -1;
+            return;
+        }
+        if (move[0] == -1) {
+            fromSquare = move[1];
+            toSquare = move[1] + move[2] * 2;
+            return;
+        }
+        if (move[0] == -2) {
+            fromSquare = move[1];
+            toSquare = move[1] - 8 * gameState.getColor();
+            return;
+        }
+        if (move[0] == -3) {
+            fromSquare = move[1];
+            toSquare = move[1] - gameState.getColor() * 8 + move[2];
+            return;
+        }
+        if (move[0] <= -4) {
+            fromSquare = move[1];
+            toSquare = move[2];
+            return;
+        }
+        fromSquare = move[0];
+        toSquare = move[1];
+    }
+
     private void makeMove(byte[] move) {
+        setMoveSquares(move);
         gameStateHistory.add(gameState);
         gameStateFuture.clear();
         moveHistory.add(move);
@@ -750,6 +785,8 @@ public class Main extends Application {
                 circles[i].toBack();
                 sq.toBack();
             }
+        } else if (i == fromSquare || i == toSquare) {
+            sq.setFill(Colors.getSquareMoveColor(lightSquare));
         }
     }
 
