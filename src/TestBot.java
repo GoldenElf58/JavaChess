@@ -27,7 +27,6 @@ public class TestBot {
     }
 
     private int evaluate(MutableGameState state) {
-        if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
         int score = 0;
         byte[] board = state.getBoard();
         for (byte i = 0; i < 64; i++) score += PieceSquareTables.getPieceSquareValue(board[i], i);
@@ -143,16 +142,17 @@ public class TestBot {
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
-        MutableGameState nextState;
+        MutableGameState nextState = null;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) {
                 state.makeMoveOnlyBoard(moveSearchOrder[i]);
                 nextState = nextStates[moveSearchOrder[i]];
-            } else{
+            } else if (depth + 1 != maxDepth) {
                 if (pools[depth][i] != null) nextState = state.loadMoveTo(pools[depth][i], i);
                 else pools[depth][i] = nextState = state.makeMove(i);
-            }
-            score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
+            } else state.makeMoveOnlyBoard(i);
+            if (depth + 1 == maxDepth) score = evaluate(state);
+            else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
