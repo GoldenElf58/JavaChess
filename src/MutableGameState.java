@@ -31,7 +31,6 @@ public class MutableGameState {
     byte lastMutatingMoveIdx;
     byte lastMutatingPieceTaken;
     private boolean canEnPassant;
-    private static final byte[] bishopDirs = {9, -9, 7, -7};
 
     private MutableGameState init(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
                                   boolean blackKing, byte enPassantIdx, int halfMoves, byte halfMoveClock,
@@ -62,7 +61,7 @@ public class MutableGameState {
         this.hash = hash;
         this.positionHistory = positionHistory == null ?
                 this.positionHistory == null ? new PositionHistory(hash) :
-                this.positionHistory.init(hash) : positionHistory;
+                        this.positionHistory.init(hash) : positionHistory;
         this.canEnPassant = canEnPassant;
         this.moveCount = 0;
         this.movesGenerated = false;
@@ -93,9 +92,10 @@ public class MutableGameState {
         int idx;
         byte currKingIdx = getKingIdx();
         byte kingIdx, move_0, move_1, move_2;
-        boolean kingMoved;
+        boolean kingMoved, override;
         if (currKingIdx == -1) return;
-        boolean inCheck = inCheckByNonSlidingPiece(currKingIdx, color);
+        boolean inCheck = inCheck();
+        boolean inCheckByNonSlidingPiece = inCheckByNonSlidingPiece(currKingIdx, color);
         for (byte moveIdx = 0; moveIdx < moveCount; moveIdx++) {
             idx = moveIdx * 3;
             move_0 = moves[idx];
@@ -117,8 +117,9 @@ public class MutableGameState {
             } else {
                 kingMoved = move_0 >= 0 && abs(board[move_1]) == 6;
                 kingIdx = kingMoved ? move_1 : currKingIdx;
-                if (isAttackingSliding(kingIdx, color)) illegal = true;
-                else if (kingMoved || inCheck) {
+                override = kingMoved || inCheck || move_0 < 0;
+                if (isAttackingSliding(kingIdx, color, move_0, move_1, override)) illegal = true;
+                else if (kingMoved || inCheckByNonSlidingPiece) {
                     if (isAttackedByPawn(kingIdx, color)) illegal = true;
                     else if (isAttackedByKnight(kingIdx, color)) illegal = true;
                     else if (isAttackedByKing(kingIdx, color)) illegal = true;
@@ -140,44 +141,81 @@ public class MutableGameState {
     }
 
     private boolean isAttackingSliding(byte kingIdx, byte color) {
+        return isAttackingSliding(kingIdx, color, (byte) 0, (byte) 0, true);
+    }
+
+    private boolean isAttackingSliding(byte kingIdx, byte color, byte move_0, byte move_1,
+                                       boolean override) {
         byte piece, target;
-        target = kingIdx;
-        piece = 0;
-        while (piece == 0 && target / 8 != 0) {
-            target -= 8;
-            piece = board[target];
-            if (piece == -4 * color || piece == -5 * color) return true;
+        if (override || (move_0 - kingIdx) % 8 == 0 || (move_1 - kingIdx) % 8 == 0) {
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && target / 8 != 0) {
+                    target -= 8;
+                    piece = board[target];
+                    if (piece == -4 * color || piece == -5 * color) return true;
+                }
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && target / 8 != 7) {
+                    target += 8;
+                    piece = board[target];
+                    if (piece == -4 * color || piece == -5 * color) return true;
+                }
         }
-        target = kingIdx;
-        piece = 0;
-        while (piece == 0 && target / 8 != 7) {
-            target += 8;
-            piece = board[target];
-            if (piece == -4 * color || piece == -5 * color) return true;
+        if (override || move_0 / 8 == kingIdx / 8 || move_1 / 8 == kingIdx / 8) {
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && target % 8 != 0) {
+                    target -= 1;
+                    piece = board[target];
+                    if (piece == -4 * color || piece == -5 * color) return true;
+                }
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && target % 8 != 7) {
+                    target += 1;
+                    piece = board[target];
+                    if (piece == -4 * color || piece == -5 * color) return true;
+                }
         }
-        target = kingIdx;
-        piece = 0;
-        while (piece == 0 && target % 8 != 0) {
-            target -= 1;
-            piece = board[target];
-            if (piece == -4 * color || piece == -5 * color) return true;
+        if (override || abs(move_0 - kingIdx) % 8 == abs(move_0 - kingIdx) / 8 ||
+                abs(move_1 - kingIdx) % 8 == abs(move_1 - kingIdx) / 8) {
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && abs((target - 9) % 8 - target % 8) == 1) {
+                    target -= 9;
+                    if (target < 0 || target > 63) break;
+                    piece = board[target];
+                    if (piece == -3 * color || piece == -5 * color) return true;
+                }
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && abs((target + 9) % 8 - target % 8) == 1) {
+                    target += 9;
+                    if (target < 0 || target > 63) break;
+                    piece = board[target];
+                    if (piece == -3 * color || piece == -5 * color) return true;
+                }
         }
-        target = kingIdx;
-        piece = 0;
-        while (piece == 0 && target % 8 != 7) {
-            target += 1;
-            piece = board[target];
-            if (piece == -4 * color || piece == -5 * color) return true;
-        }
-        for (byte dir : bishopDirs) {
-            target = kingIdx;
-            piece = 0;
-            while (piece == 0 && abs((target + dir) % 8 - target % 8) == 1) {
-                target += dir;
-                if (target < 0 || target > 63) break;
-                piece = board[target];
-                if (piece == -3 * color || piece == -5 * color) return true;
-            }
+        if (override || 7 - abs(move_0 - kingIdx) % 8 == abs(move_0 - kingIdx) / 8 ||
+                7 - abs(move_1 - kingIdx) % 8 == abs(move_1 - kingIdx) / 8) {
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && abs((target - 7) % 8 - target % 8) == 1) {
+                    target -= 7;
+                    if (target < 0 || target > 63) break;
+                    piece = board[target];
+                    if (piece == -3 * color || piece == -5 * color) return true;
+                }
+                target = kingIdx;
+                piece = 0;
+                while (piece == 0 && abs((target + 7) % 8 - target % 8) == 1) {
+                    target += 7;
+                    if (target < 0 || target > 63) break;
+                    piece = board[target];
+                    if (piece == -3 * color || piece == -5 * color) return true;
+                }
         }
         return false;
     }
