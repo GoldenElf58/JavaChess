@@ -59,6 +59,7 @@ public class TestBot {
             System.out.println("Depth: " + depth);
             System.out.println("Score: " + score);
         }
+        clearCache();
     }
 
     public void minimaxMove(MutableGameState state, int depth, boolean isMaximizing) {
@@ -120,7 +121,7 @@ public class TestBot {
         final Integer[] moveSearchOrder;
         final MutableGameState[] nextStates;
         final boolean sortMoves = maxDepth - depth > 2;
-        if (sortMoves) {
+        if (maxDepth - depth > 3) {
             moveSearchOrder = new Integer[state.getMoveCount()];
             nextStates = new MutableGameState[state.getMoveCount()];
             for (int i = 0; i < state.getMoveCount(); i++) {
@@ -132,6 +133,17 @@ public class TestBot {
             Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
                     (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
                             - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
+        } else if (sortMoves) {
+            moveSearchOrder = new Integer[state.getMoveCount()];
+            nextStates = new MutableGameState[state.getMoveCount()];
+            for (int i = 0; i < state.getMoveCount(); i++) {
+                moveSearchOrder[i] = i;
+                if (pools[depth][i] != null) nextStates[i] = state.loadMoveTo(pools[depth][i], i);
+                else nextStates[i] = pools[depth][i] = state.makeMove(i);
+                state.undoMove();
+            }
+            Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
+                    (nextStates[m1].getEvaluation() - nextStates[m2].getEvaluation()));
         } else {
             nextStates = null;
             moveSearchOrder = null;
