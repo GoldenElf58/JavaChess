@@ -34,10 +34,7 @@ public class Bot {
     }
 
     private int evaluate(MutableGameState state) {
-        int score = 0;
-        byte[] board = state.getBoard();
-        for (byte i = 0; i < 64; i++) score += PieceSquareTables.getPieceSquareValue(board[i], i);
-        return score;
+        return state.getEvaluation();
     }
 
     public int getMove(GameState state, double allottedTime) {
@@ -221,8 +218,8 @@ public class Bot {
             } else if (depth + 1 != maxDepth) {
                 if (pools[depth][i] != null) nextState = state.loadMoveTo(pools[depth][i], i);
                 else pools[depth][i] = nextState = state.makeMove(i);
-            } else state.makeMoveOnlyBoard(i);
-            if (depth + 1 == maxDepth) score = evaluate(state);
+            } else state.makeMoveOnlyBoardEval(i);
+            if (depth + 1 == maxDepth) score = state.getCurEval();
             else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {

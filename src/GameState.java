@@ -831,11 +831,13 @@ public class GameState {
     }
 
     public MutableGameState asMutable() {
+        int score = 0;
+        for (byte i = 0; i < 64; i++) score += PieceSquareTables.getPieceSquareValue(board[i], i);
         return new MutableGameState(board.clone(), whiteQueen, whiteKing, blackQueen, blackKing,
                 lastMove == null ? -1 : lastMove[1], halfMoves, halfMoveClock, whiteMove,
                 positionHistory, isWinner, winner, blackKnights, whiteKnights, blackBishops,
                 whiteBishops, otherPieces, whiteKingSquare, blackKingSquare, zobrist,
-                lastMove != null, getHash());
+                lastMove != null, getHash(), score);
     }
 
     public String moveToString(int moveIdx) {

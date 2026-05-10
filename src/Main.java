@@ -79,7 +79,7 @@ public class Main extends Application {
     private static final boolean whitePlayerHuman = true;
     private static final boolean blackPlayerHuman = false;
     private static final double allottedTime = 1.5;
-    private static final int N = 25;
+    private static final int N = 50;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
     private static final boolean useBot1 = true;
