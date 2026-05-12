@@ -15,8 +15,9 @@
     6. Select Modify Options > Add VM Options
    7. Add the following arguments to the VM Options field, replacing '...' with the path to where
       the JavaFX SDK is installed
-      1. `--module-path /.../javafx-sdk-24.0.2/lib --add-modules javafx.controls,javafx.fxml,
-      javafx.web`
+      1. `--module-path /Users/owenrinne/Developer/javafx-sdk-24.0.2/lib
+--add-modules javafx.controls,javafx.fxml,javafx.web
+--enable-native-access=javafx.graphics,javafx.media`
    8. Click OK
 6. You're ready!
 
@@ -27,9 +28,9 @@
 Before starting the game, you can adjust the below settings within the code (all in `Main.java`,
 starting on line 77)
 
-- `runBenchmarkOnly` - Whether to run the benchmark or not (you can probably ignore this; also 
-  note that the benchmark could be in different states based off of what has been benchmarked 
-  recently)
+- `runBenchmarkOnly` - Whether to run the benchmark or not (you can probably ignore this and 
+  leave/set it to false if you're not benchmarking anything; also note that the benchmark could 
+  be in different states based off of what has been benchmarked recently)
 - `whitePlayerHuman` - Whether the white player is a human or a bot
 - `blackPlayerHuman` - Whether the black player is a human or a bot
 - `allottedTime` - the number of seconds the bot has to move
