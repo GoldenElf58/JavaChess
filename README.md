@@ -15,7 +15,7 @@
     6. Select Modify Options > Add VM Options
    7. Add the following arguments to the VM Options field, replacing '...' with the path to where
       the JavaFX SDK is installed
-      1. `--module-path /Users/owenrinne/Developer/javafx-sdk-24.0.2/lib
+      1. `--module-path /<insert path here>/javafx-sdk-24.0.2/lib
 --add-modules javafx.controls,javafx.fxml,javafx.web
 --enable-native-access=javafx.graphics,javafx.media`
    8. Click OK
