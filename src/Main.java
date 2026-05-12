@@ -78,7 +78,7 @@ public class Main extends Application {
     private static final boolean runBenchmarkOnly = true;
     private static final boolean whitePlayerHuman = true;
     private static final boolean blackPlayerHuman = false;
-    private static final double allottedTime = 1.5;
+    private static final double allottedTime = 1.0;
     private static final int N = 50;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
@@ -232,7 +232,7 @@ public class Main extends Application {
         System.out.printf("New time 95%% CI: (%s, %s)%n", time(round(ciNew[0])), time(round(ciNew[1])));
         System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
-        System.out.printf("Time: %s%n", time(watch.getElapsedTimeNanos()));
+        System.out.printf("Time: %s%n", watch);
         System.out.printf("Average time per half-move: %s%n",
                 time(watch.getElapsedTimeNanos() / totalHalfMoves));
         System.out.printf("Average time per game: %s%n", time(watch.getElapsedTimeNanos() / N));

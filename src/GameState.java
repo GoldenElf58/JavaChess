@@ -64,6 +64,35 @@ public class GameState {
         blackKingSquare = 4;
     }
 
+    GameState(byte[] board) {
+        zobrist = new ZobristHash();
+        this.board = board;
+        whiteQueen = true;
+        whiteKing = true;
+        blackQueen = true;
+        blackKing = true;
+        lastMove = null;
+        halfMoves = 0;
+        halfMoveClock = 0;
+        whiteMove = true;
+        color = 1;
+        positionHistory = new PositionHistory(zobrist.hash(this));
+        isWinner = false;
+        winner = 0;
+        blackKnights = 2;
+        whiteKnights = 2;
+        blackBishops = 2;
+        whiteBishops = 2;
+        otherPieces = 22;
+        byte wk = 0, bk = 0;
+        for (byte i = 0; i < 64; i++) {
+            if (board[i] == 6) wk = i;
+            if (board[i] == -6) bk = i;
+        }
+        whiteKingSquare = wk;
+        blackKingSquare = bk;
+    }
+
     GameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
               boolean blackKing, byte[] lastMove, int halfMoves, byte halfMoveClock,
               boolean whiteMove, PositionHistory positionHistory, boolean isWinner,

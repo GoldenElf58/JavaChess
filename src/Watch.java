@@ -29,4 +29,9 @@ public class Watch {
     public long getElapsedTimeSeconds() {
         return getElapsedTimeNanos() / 1_000_000_000;
     }
+
+    @Override
+    public String toString() {
+        return Main.time(getElapsedTimeNanos());
+    }
 }
