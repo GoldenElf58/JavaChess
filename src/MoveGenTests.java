@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 
 public class MoveGenTests {
 
+    public static final MutableGameState[] gameStates = new MutableGameState[6];
+
     private static long countMoves(GameState state, int depth) {
         state.computeMoves();
         if (depth == 1) return state.getMoveCount();
@@ -18,12 +20,49 @@ public class MoveGenTests {
         state.computeMoves();
         if (depth == 1) return state.getMoveCount();
         long moves = 0;
-        MutableGameState next = new GameState().asMutable();
+        if (gameStates[depth - 1] == null) gameStates[depth - 1] = new GameState().asMutable();
+        MutableGameState tmp = gameStates[depth - 1];
         for (int i = 0; i < state.getMoveCount(); i++) {
-            moves += countMoves(state.loadMoveTo(next, i), depth - 1);
+            moves += countMoves(state.loadMoveTo(tmp, i), depth - 1);
             state.undoMove();
         }
         return moves;
+    }
+
+    @Test
+    public void benchmarkMutable() {
+        GameState state = new GameState();
+
+        countMoves(state.asMutable(), 6);
+
+        long start = System.nanoTime();
+        long nodes = countMoves(state.asMutable(), 6);
+        long end = System.nanoTime();
+
+        double sec = (end - start) / 1e9;
+
+        System.out.println("====== Mutable ======");
+        System.out.println("Nodes: " + nodes);
+        System.out.println("Time: " + sec);
+        System.out.println("MNPS: " + ((int) (nodes / sec)) / 1_000_000.0);
+    }
+
+    @Test
+    public void benchmarkImmutable() {
+        GameState state = new GameState();
+
+        countMoves(state, 6);
+
+        long start = System.nanoTime();
+        long nodes = countMoves(state, 6);
+        long end = System.nanoTime();
+
+        double sec = (end - start) / 1e9;
+
+        System.out.println("===== Immutable =====");
+        System.out.println("Nodes: " + nodes);
+        System.out.println("Time: " + sec);
+        System.out.println("MNPS: " + ((int) (nodes / sec)) / 1_000_000.0);
     }
 
     @Test
