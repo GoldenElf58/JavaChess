@@ -10,6 +10,7 @@ public class Bot {
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
     private final boolean log;
+    private boolean print;
     private final TTEntry emptyTT = new TTEntry();
     private MutableGameState[][] pools = new MutableGameState[10][218];
     private volatile boolean stopSearch = false;
@@ -25,8 +26,13 @@ public class Bot {
         }
     }
 
-    public Bot(boolean log) {
+    public Bot(boolean log, boolean print) {
         this.log = log;
+        this.print = print;
+    }
+
+    public void setPrinting(boolean print) {
+        this.print = print;
     }
 
     public void clearCache() {
@@ -88,10 +94,12 @@ public class Bot {
                 System.out.println("Failed to append to file depths.txt");
             }
         }
+        if (print) {
+            System.out.println("Depth: " + depth[0]);
+            System.out.println("Score: " + score);
+            System.out.println("Time: " + watch.getElapsedTimeMillis() / 1000d + "s");
+        }
         clearCache();
-        System.out.println("Depth: " + depth[0]);
-        System.out.println("Score: " + score);
-        System.out.println("Time: " + watch.getElapsedTimeMillis() / 1000d + "s");
         return move[0];
     }
 
@@ -123,6 +131,8 @@ public class Bot {
             } catch (IOException e) {
                 System.out.println("Failed to append to file depths.txt");
             }
+        }
+        if (print) {
             System.out.println("Depth: " + depth);
             System.out.println("Score: " + score);
         }

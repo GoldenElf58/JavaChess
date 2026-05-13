@@ -65,7 +65,6 @@ public class GameState {
     }
 
     GameState(byte[] board) {
-        zobrist = new ZobristHash();
         this.board = board;
         whiteQueen = true;
         whiteKing = true;
@@ -76,21 +75,79 @@ public class GameState {
         halfMoveClock = 0;
         whiteMove = true;
         color = 1;
-        positionHistory = new PositionHistory(zobrist.hash(this));
         isWinner = false;
         winner = 0;
-        blackKnights = 2;
-        whiteKnights = 2;
-        blackBishops = 2;
-        whiteBishops = 2;
-        otherPieces = 22;
-        byte wk = 0, bk = 0;
+        byte blackKnights = 0;
+        byte whiteKnights = 0;
+        byte blackBishops = 0;
+        byte whiteBishops = 0;
+        byte otherPieces = 0;
+        byte whiteKingSquare = 0;
+        byte blackKingSquare = 0;
         for (byte i = 0; i < 64; i++) {
-            if (board[i] == 6) wk = i;
-            if (board[i] == -6) bk = i;
+            byte piece = board[i];
+            if (piece == 6) whiteKingSquare = i;
+            else if (piece == -6) blackKingSquare = i;
+            else if (piece == -2) blackKnights++;
+            else if (piece == 2) whiteKnights++;
+            else if (piece == -3) blackBishops++;
+            else if (piece == 3) whiteBishops++;
+            else otherPieces++;
         }
-        whiteKingSquare = wk;
-        blackKingSquare = bk;
+        this.blackKnights = blackKnights;
+        this.whiteKnights = whiteKnights;
+        this.blackBishops = blackBishops;
+        this.whiteBishops = whiteBishops;
+        this.otherPieces = otherPieces;
+        this.whiteKingSquare = whiteKingSquare;
+        this.blackKingSquare = blackKingSquare;
+        zobrist = new ZobristHash();
+        positionHistory = new PositionHistory(zobrist.hash(this));
+    }
+
+    GameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,
+              boolean blackKing, byte[] lastMove, int halfMoves, byte halfMoveClock,
+              boolean whiteMove, PositionHistory positionHistory, boolean isWinner,
+              byte winner) {
+        this.board = board;
+        this.whiteQueen = whiteQueen;
+        this.whiteKing = whiteKing;
+        this.blackQueen = blackQueen;
+        this.blackKing = blackKing;
+        this.lastMove = lastMove;
+        this.halfMoves = halfMoves;
+        this.halfMoveClock = halfMoveClock;
+        this.whiteMove = whiteMove;
+        this.color = (byte) (whiteMove ? 1 : -1);
+        this.isWinner = isWinner;
+        this.winner = winner;
+        byte blackKnights = 0;
+        byte whiteKnights = 0;
+        byte blackBishops = 0;
+        byte whiteBishops = 0;
+        byte otherPieces = 0;
+        byte whiteKingSquare = 0;
+        byte blackKingSquare = 0;
+        for (byte i = 0; i < 64; i++) {
+            byte piece = board[i];
+            if (piece == 6) whiteKingSquare = i;
+            else if (piece == -6) blackKingSquare = i;
+            else if (piece == -2) blackKnights++;
+            else if (piece == 2) whiteKnights++;
+            else if (piece == -3) blackBishops++;
+            else if (piece == 3) whiteBishops++;
+            else otherPieces++;
+        }
+        this.blackKnights = blackKnights;
+        this.whiteKnights = whiteKnights;
+        this.blackBishops = blackBishops;
+        this.whiteBishops = whiteBishops;
+        this.otherPieces = otherPieces;
+        this.whiteKingSquare = whiteKingSquare;
+        this.blackKingSquare = blackKingSquare;
+        zobrist = new ZobristHash();
+        this.positionHistory = positionHistory == null ? new PositionHistory(getHash())
+                : positionHistory;
     }
 
     GameState(byte[] board, boolean whiteQueen, boolean whiteKing, boolean blackQueen,

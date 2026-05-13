@@ -5,19 +5,22 @@ import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
 import javafx.stage.Stage;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.*;
 
 import static java.lang.Math.*;
 
@@ -41,6 +44,15 @@ public class Main extends Application {
     static final double LINE_WIDTH_RATIO = 0.15;
     static final double CIRCLE_RING_RATIO = 0.0833333333;
 
+    static final String btnStyle = "-fx-background-color: #333333; -fx-text-fill: white; " +
+            "-fx-border-color: transparent;";
+    static final String btnHoverStyle = "-fx-background-color: #555555; -fx-text-fill: white; " +
+            "-fx-border-color: transparent;";
+    static final String btnClickStyle = "-fx-background-color: #777777; -fx-text-fill: white; " +
+            "-fx-border-color: transparent;";
+    static final String tfStyle = "-fx-background-color: #333333; -fx-text-fill: white; " +
+            "-fx-border-color: transparent;";
+
     private final Map<Integer, Image> imageCache = new HashMap<>();
     private static double previousWidth = DEFAULT_SCENE_WIDTH;
     private static double previousHeight = DEFAULT_SCENE_HEIGHT;
@@ -60,6 +72,9 @@ public class Main extends Application {
     private ImageView[] pieces;
     private final Rectangle[] borders = new Rectangle[2];
 
+    private Button btnWhitePlayer, btnBlackPlayer, btnDeepTest;
+    private TextField tfAllottedTime;
+
     private final double[] mousePose = {-1, -1};
     private int specialStartSquare = -1;
     private int selectedSquare = -1;
@@ -75,61 +90,33 @@ public class Main extends Application {
     // ==============================
     // Parameters
     // ==============================
-    private static final boolean runBenchmarkOnly = true;
-    private static final boolean whitePlayerHuman = true;
-    private static final boolean blackPlayerHuman = false;
-    private static final double allottedTime = 1.0;
+    private static final boolean runBenchmarkOnly = false;
+    private static boolean whitePlayerHuman = true;
+    private static boolean blackPlayerHuman = true;
+    private static final boolean debug = false;
+    private static final boolean verbose = false;
+    private static double allottedTime = 1.0;
+    private static boolean deepTest = false;
+    private static int testIdx = 0;
+    private static int whiteWins = 0;
+    private static int blackWins = 0;
+    private static int draws = 0;
     private static final int N = 50;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
     private static final boolean useBot1 = true;
     private static final boolean useTestBot = false;
 
-    private final Bot bot = new Bot(true);
+    private final Bot whiteBot = new Bot(true, true);
+    private final Bot blackBot = new Bot(true, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
-        if (runBenchmarkOnly) {
-            runBenchmark();
-            System.exit(0);
-        }
-        launch(args);
-        boolean run = askYesWithTimeout("Run benchmark? (y/n) ", 5);
-        if (run) {
-            boolean debug = askYesWithTimeout("Debug mode? (y/n) ", 3);
-            boolean verbose = false;
-            if (debug) verbose = askYesWithTimeout("Verbose debug mode? (y/n) ", 3);
-            runBenchmark(debug, verbose);
-        }
-        System.exit(0);
-    }
-
-    private static boolean askYesWithTimeout(String prompt, int seconds) {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Scanner scanner = new Scanner(System.in);
-        Future<String> future = executor.submit(scanner::nextLine);
-
-        try (scanner) {
-            System.out.print(prompt);
-            String input = future.get(seconds, TimeUnit.SECONDS);
-            return input != null && input.equalsIgnoreCase("y");
-        } catch (TimeoutException e) {
-            System.out.println("\nTimed out");
-            future.cancel(true);
-            return false;
-        } catch (ExecutionException | InterruptedException e) {
-            future.cancel(true);
-            return false;
-        } finally {
-            executor.shutdownNow();
-        }
+        if (runBenchmarkOnly) runBenchmark();
+        else launch(args);
     }
 
     private static void runBenchmark() {
-        runBenchmark(false, false);
-    }
-
-    private static void runBenchmark(boolean debug, boolean verbose) {
         GameState gameState;
         double lastUpdate = -1;
         long lastTime = -1;
@@ -137,7 +124,7 @@ public class Main extends Application {
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
-        Bot bot1 = new Bot(false);
+        Bot bot1 = new Bot(false, false);
         TestBot bot2 = new TestBot(false);
         Random random = new Random();
         Watch watch = new Watch();
@@ -161,8 +148,8 @@ public class Main extends Application {
                     newWatch.stop();
                     gameState = gameState.makeMove(move);
                     gameState.computeMoves();
-                    if (debug) {
-                        if (verbose) {
+                    if (Main.debug) {
+                        if (Main.verbose) {
                             System.out.println(gameState);
                             gameState.printMoves();
                         }
@@ -189,8 +176,8 @@ public class Main extends Application {
                 newWatch.stop();
                 gameState = gameState.makeMove(move);
                 gameState.computeMoves();
-                if (debug) {
-                    if (verbose) {
+                if (Main.debug) {
+                    if (Main.verbose) {
                         System.out.println(gameState);
                         gameState.printMoves();
                     }
@@ -292,12 +279,11 @@ public class Main extends Application {
         scene = new Scene(root, 720, 480, Color.grayRgb(0));
         pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT,
                 Color.TRANSPARENT);
-
         SoundHandler.loadSounds();
 
         pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
-        gameState = new GameState();
+        gameState = FenUtils.getFenGameState(0);
         gameStateHistory = new Stack<>();
         gameStateFuture = new Stack<>();
         moveHistory = new Stack<>();
@@ -305,8 +291,14 @@ public class Main extends Application {
 
         initializeNodes(root);
 
+        root.getChildren().add(tfAllottedTime = getAllottedTimeTF());
+        root.getChildren().add(btnBlackPlayer = getWhitePlayerButton());
+        root.getChildren().add(btnWhitePlayer = getBlackPlayerButton());
+        root.getChildren().add(btnDeepTest = getDeepTestButton());
+
         stage.setScene(scene);
         stage.show();
+        scene.getRoot().requestFocus();
 
         gameState.computeMoves();
         if (!whitePlayerHuman) makeBotMoveAsync();
@@ -317,7 +309,7 @@ public class Main extends Application {
         scene.setOnMouseMoved(this::onMouseMoved);
         scene.setOnKeyPressed(this::onKeyPressed);
         scene.setOnKeyReleased(this::onKeyReleased);
-        stage.setOnCloseRequest((_) -> appOpen = false);
+        stage.setOnCloseRequest(_ -> appOpen = false);
 
         scene.widthProperty().addListener(_ -> updatePositions());
         scene.heightProperty().addListener(_ -> updatePositions());
@@ -330,6 +322,96 @@ public class Main extends Application {
             }
         };
         gameLoop.start();
+    }
+
+    private @NotNull TextField getAllottedTimeTF() {
+        TextField allottedTimeTF = new TextField();
+        allottedTimeTF.setTranslateX(10);
+        allottedTimeTF.setTranslateY(150);
+        allottedTimeTF.setPrefHeight(30);
+        allottedTimeTF.setPrefWidth(100);
+        allottedTimeTF.setStyle(tfStyle);
+        allottedTimeTF.setText(String.valueOf(allottedTime));
+        allottedTimeTF.deselect();
+        allottedTimeTF.setOnAction(_ -> {
+            if (!deepTest) allottedTime = Double.parseDouble(allottedTimeTF.getText());
+            System.out.println("Alloted Time Set To: " + time((long) (allottedTime * 1e9), 3));
+        });
+        allottedTimeTF.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) scene.getRoot().requestFocus();
+        });
+        return allottedTimeTF;
+    }
+
+    private @NotNull Button getBlackPlayerButton() {
+        Button blackPlayer = new Button(blackPlayerHuman ? "Black Human" : "Black Bot");
+        blackPlayer.setTranslateX(10);
+        blackPlayer.setTranslateY(200);
+        blackPlayer.setPrefHeight(30);
+        blackPlayer.setPrefWidth(100);
+        blackPlayer.setStyle(btnStyle);
+        blackPlayer.setOnMouseEntered(_ -> blackPlayer.setStyle(btnHoverStyle));
+        blackPlayer.setOnMouseExited(_ -> blackPlayer.setStyle(btnStyle));
+        blackPlayer.setOnAction(_ -> {
+            blackPlayer.setStyle(btnHoverStyle);
+            if (!deepTest) blackPlayerHuman = !blackPlayerHuman;
+            if (!blackPlayerHuman && gameState.getColor() == -1) makeBotMoveAsync();
+            blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black Bot");
+        });
+        blackPlayer.setOnMousePressed(_ -> blackPlayer.setStyle(btnClickStyle));
+        return blackPlayer;
+    }
+
+    private @NotNull Button getWhitePlayerButton() {
+        Button whitePlayer = new Button(whitePlayerHuman ? "White Human" : "White Bot");
+        whitePlayer.setTranslateX(10);
+        whitePlayer.setTranslateY(250);
+        whitePlayer.setPrefHeight(30);
+        whitePlayer.setPrefWidth(100);
+        whitePlayer.setStyle(btnStyle);
+        whitePlayer.setOnMouseEntered(_ -> whitePlayer.setStyle(btnHoverStyle));
+        whitePlayer.setOnMouseExited(_ -> whitePlayer.setStyle(btnStyle));
+        whitePlayer.setOnAction(_ -> {
+            whitePlayer.setStyle(btnHoverStyle);
+            if (!deepTest) whitePlayerHuman = !whitePlayerHuman;
+            if (!whitePlayerHuman && gameState.getColor() == 1) makeBotMoveAsync();
+            whitePlayer.setText(whitePlayerHuman ? "White Human" : "White Bot");
+        });
+        whitePlayer.setOnMousePressed(_ -> whitePlayer.setStyle(btnClickStyle));
+        return whitePlayer;
+    }
+
+    private @NotNull Button getDeepTestButton() {
+        Button deepTest = new Button(Main.deepTest ? "Stop" : "Deep Test");
+        deepTest.setTranslateX(10);
+        deepTest.setTranslateY(300);
+        deepTest.setPrefHeight(30);
+        deepTest.setPrefWidth(100);
+        deepTest.setStyle(btnStyle);
+        deepTest.setOnMouseEntered(_ -> deepTest.setStyle(btnHoverStyle));
+        deepTest.setOnMouseExited(_ -> deepTest.setStyle(btnStyle));
+        deepTest.setOnAction(_ -> {
+            deepTest.setStyle(btnHoverStyle);
+            Main.deepTest = !Main.deepTest;
+            whitePlayerHuman = !Main.deepTest;
+            blackPlayerHuman = !Main.deepTest;
+            allottedTime = 0.1;
+            testIdx = 0;
+            tfAllottedTime.setText(String.valueOf(allottedTime));
+            deepTest.setText(Main.deepTest ? "Stop" : "Deep Test");
+            whiteBot.setPrinting(!Main.deepTest);
+            blackBot.setPrinting(!Main.deepTest);
+            if (Main.deepTest) {
+                gameStateFuture.clear();
+                gameStateHistory.clear();
+                moveHistory.clear();
+                gameState = FenUtils.getFenGameState(testIdx);
+                gameState.computeMoves();
+                makeBotMoveAsync();
+            }
+        });
+        deepTest.setOnMousePressed(_ -> deepTest.setStyle(btnClickStyle));
+        return deepTest;
     }
 
     public void loop() {
@@ -500,6 +582,7 @@ public class Main extends Application {
     }
 
     private void onMouseClicked(MouseEvent e) {
+        scene.getRoot().requestFocus();
         int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
         double length = scene.getHeight() / 8;
         if (e.getButton() == MouseButton.SECONDARY) {
@@ -651,12 +734,30 @@ public class Main extends Application {
     }
 
     private void makeBotMoveAsync() {
-        if (!gameState.isInProgress() || !appOpen) return;
+        if (!gameState.isInProgress() || !appOpen) {
+            if (deepTest) {
+                if (gameState.getWinner() == 1) whiteWins++;
+                else if (gameState.getWinner() == -1) blackWins++;
+                else draws++;
+                testIdx++;
+                IO.println("White Wins: " + whiteWins + " Black Wins: " + blackWins +
+                        " Draws: " + draws);
+                gameStateFuture.clear();
+                gameStateHistory.clear();
+                moveHistory.clear();
+                gameState = FenUtils.getFenGameState(testIdx);
+                gameState.computeMoves();
+                makeBotMoveAsync();
+            }
+            return;
+        }
         selectedSquare = -1;
         new Thread(() -> {
-            makeMove(bot.getMove(gameState, allottedTime));
+            makeMove((gameState.getColor() == 1 ? whiteBot : blackBot)
+                    .getMove(gameState, allottedTime));
             gameState.computeMoves();
-            if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman) makeBotMoveAsync();
+            if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
+                makeBotMoveAsync();
         }).start();
     }
 
@@ -686,6 +787,26 @@ public class Main extends Application {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = height / 8;
+        if ((width - height) / 2 < 120) {
+            tfAllottedTime.setVisible(false);
+            btnWhitePlayer.setVisible(false);
+            btnBlackPlayer.setVisible(false);
+            btnDeepTest.setVisible(false);
+        } else {
+            tfAllottedTime.setVisible(true);
+            btnWhitePlayer.setVisible(true);
+            btnBlackPlayer.setVisible(true);
+            btnDeepTest.setVisible(true);
+            double x = (width - height) / 2 - 110;
+            tfAllottedTime.setTranslateX(x);
+            btnWhitePlayer.setTranslateX(x);
+            btnBlackPlayer.setTranslateX(x);
+            btnDeepTest.setTranslateX(x);
+            tfAllottedTime.setTranslateY(height / 2 - 90);
+            btnWhitePlayer.setTranslateY(height / 2 - 40);
+            btnBlackPlayer.setTranslateY(height / 2 + 10);
+            btnDeepTest.setTranslateY(height / 2 + 60);
+        }
         if (width < 292 - 28) {
             System.out.println(width + " " + height);
             width = 292 - 28;
