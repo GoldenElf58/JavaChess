@@ -26,7 +26,7 @@
 ### In Code Settings
 
 Before starting the game, you can adjust the below settings within the code (all in `Main.java`,
-starting on line 77)
+starting around line 93)
 
 - `runBenchmarkOnly` - Whether to run the benchmark or not (you can probably ignore this and 
   leave/set it to false if you're not benchmarking anything; also note that the benchmark could 
