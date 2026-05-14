@@ -5,7 +5,7 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class TestBot implements Bot {
+public class CurrBot implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -26,7 +26,7 @@ public class TestBot implements Bot {
         }
     }
 
-    public TestBot(boolean log, boolean print) {
+    public CurrBot(boolean log, boolean print) {
         this.log = log;
         this.print = print;
     }

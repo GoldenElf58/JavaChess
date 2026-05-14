@@ -105,17 +105,19 @@ public class Main extends Application {
     private static double allottedTime = 1.0;
     private static boolean deepTest = false;
     private static int testIdx = 0;
-    private static int whiteWins = 0;
-    private static int blackWins = 0;
+    private static int currWins = 0;
+    private static int testWins = 0;
     private static int draws = 0;
     private static final int N = 50;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
-    private static final boolean useBot1 = true;
+    private static final boolean useCurrBot = true;
     private static final boolean useTestBot = false;
+    private static final boolean useBot1Move = true;
+    private static final boolean useTestBotMove = false;
 
-    private final Bot whiteBot = new Bot(true, true);
-    private final Bot blackBot = new Bot(true, true);
+    private final CurrBot currBot = new CurrBot(true, true);
+    private final TestBot testBot = new TestBot(true, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
@@ -131,8 +133,8 @@ public class Main extends Application {
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
-        Bot bot1 = new Bot(false, false);
-        TestBot bot2 = new TestBot(false);
+        CurrBot currBot = new CurrBot(false, false);
+        TestBot testBot = new TestBot(false, false);
         Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
@@ -148,10 +150,10 @@ public class Main extends Application {
                     movesThisGame++;
                     int move = random.nextInt(gameState.getMoveCount());
                     oldWatch.start();
-                    if (useBot1) bot1.iterativeDeepening(gameState, 3);
+                    if (useCurrBot) currBot.iterativeDeepening(gameState, 3);
                     oldWatch.stop();
                     newWatch.start();
-                    if (useTestBot) bot2.iterativeDeepening(gameState, 3);
+                    if (useTestBot) testBot.iterativeDeepening(gameState, 3);
                     newWatch.stop();
                     gameState = gameState.makeMove(move);
                     gameState.computeMoves();
@@ -163,8 +165,8 @@ public class Main extends Application {
                         System.out.printf("Half moves: %,d%n", movesThisGame);
                     }
                 }
-                bot1.clearCache();
-                bot2.clearCache();
+                currBot.clearCache();
+                testBot.clearCache();
             }
         }
         for (int i = 0; i < N + warmup; i++) {
@@ -176,10 +178,12 @@ public class Main extends Application {
                 movesThisGame++;
                 int move = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
-                if (useBot1) move = bot1.iterativeDeepening(gameState, maxDepth);
+                if (useCurrBot)
+                    move = useBot1Move ? currBot.iterativeDeepening(gameState, maxDepth) : move;
                 oldWatch.stop();
                 newWatch.start();
-                if (useTestBot) bot2.iterativeDeepening(gameState, maxDepth);
+                if (useTestBot)
+                    move = useTestBotMove ? testBot.iterativeDeepening(gameState, maxDepth) : move;
                 newWatch.stop();
                 gameState = gameState.makeMove(move);
                 gameState.computeMoves();
@@ -200,8 +204,8 @@ public class Main extends Application {
                 System.out.printf("\r%.0f%% [%s] [%ss]", progress, bar, lastTime);
                 lastUpdate = (int) progress;
             }
-            bot1.clearCache();
-            bot2.clearCache();
+            currBot.clearCache();
+            testBot.clearCache();
             if (i >= warmup) {
                 oldTimes[i - warmup] = oldWatch.getElapsedTimeNanos();
                 newTimes[i - warmup] = newWatch.getElapsedTimeNanos();
@@ -214,8 +218,8 @@ public class Main extends Application {
         watch.stop();
         IO.println("\n");
         System.out.printf("Max depth: %d%n", maxDepth);
-        System.out.printf("Use Bot 1: %b%n", useBot1);
-        System.out.printf("Use Bot 1: %b%n", useTestBot);
+        System.out.printf("Use Curr Bot: %b%n", useCurrBot);
+        System.out.printf("Use Test Bot: %b%n", useTestBot);
         System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
         System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
@@ -240,15 +244,12 @@ public class Main extends Application {
 
     public static String time(long time, int precision) {
         String fmt = "%,." + precision + "g";
-        if (time < 1_000) {
+        if (time < 1_000)
             return String.format("%s ns", String.format(fmt, (double) time));
-        }
-        if (time < 1_000_000) {
+        if (time < 1_000_000)
             return String.format("%s µs", String.format(fmt, time / 1_000.0));
-        }
-        if (time < 1_000_000_000) {
+        if (time < 1_000_000_000)
             return String.format("%s ms", String.format(fmt, time / 1_000_000.0));
-        }
         return String.format("%s s", String.format(fmt, time / 1_000_000_000.0));
     }
 
@@ -290,7 +291,7 @@ public class Main extends Application {
 
         pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
-        gameState = new GameState();
+        gameState = FenUtils.getFenGameState(0);
         gameStateHistory = new Stack<>();
         gameStateFuture = new Stack<>();
         moveHistory = new Stack<>();
@@ -407,13 +408,18 @@ public class Main extends Application {
             testIdx = 0;
             tfAllottedTime.setText(String.valueOf(allottedTime));
             deepTest.setText(Main.deepTest ? "Stop" : "Deep Test");
-            whiteBot.setPrinting(!Main.deepTest);
-            blackBot.setPrinting(!Main.deepTest);
+            currBot.setPrinting(!Main.deepTest);
+            testBot.setPrinting(!Main.deepTest);
             if (Main.deepTest) {
+                currBot.clearCache();
+                testBot.clearCache();
+                currWins = 0;
+                testWins = 0;
+                draws = 0;
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
-                textRight.setText("White Wins: 0\nBlack Wins: 0\nDraws: 0");
+                textRight.setText("White Wins: 0\nBlack Wins: 0\nDraws: 0\nP-Value: 1.0000");
                 gameState = FenUtils.getFenGameState(testIdx);
                 gameState.computeMoves();
                 makeBotMoveAsync();
@@ -429,7 +435,7 @@ public class Main extends Application {
         text.setTranslateY(25);
         text.setWrappingWidth(100);
         text.setFill(Color.WHITE);
-        text.setFont(new Font(16));
+        text.setFont(new Font(14));
         return text;
     }
 
@@ -752,21 +758,64 @@ public class Main extends Application {
         gameState.computeMoves();
     }
 
+    private double getPValue(int wins, int draws, int losses) {
+        int n = wins + draws + losses;
+        if (n == 0) return 1.0;
+        double score = (wins + 0.5 * draws) / n;
+        double z = (score - 0.5) / Math.sqrt(0.25 / n);
+
+        return 2 * (1 - normalCDF(Math.abs(z)));
+    }
+
+    private static double normalCDF(double x) {
+        return 0.5 * (1 + erf(x / Math.sqrt(2)));
+    }
+
+    private static double erf(double x) {
+        double t = 1.0 / (1.0 + 0.3275911 * Math.abs(x));
+
+        double a1 = 0.254829592;
+        double a2 = -0.284496736;
+        double a3 = 1.421413741;
+        double a4 = -1.453152027;
+        double a5 = 1.061405429;
+
+        double poly = (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t;
+        double result = 1 - poly * Math.exp(-x * x);
+
+        return x >= 0 ? result : -result;
+    }
+
     private void makeBotMoveAsync() {
         if (!gameState.isInProgress() || !appOpen) {
             if (deepTest) {
-                if (gameState.getWinner() == 1) whiteWins++;
-                else if (gameState.getWinner() == -1) blackWins++;
-                else draws++;
+                if (gameState.getWinner() == 1) {
+                    if (testIdx % 2 == 0) currWins++;
+                    if (testIdx % 2 == 1) testWins++;
+                } else if (gameState.getWinner() == -1) {
+                    if (testIdx % 2 == 0) testWins++;
+                    if (testIdx % 2 == 1) currWins++;
+                } else draws++;
                 testIdx++;
-                IO.println("White Wins: " + whiteWins + " Black Wins: " + blackWins +
-                        " Draws: " + draws);
-                textRight.setText("White Wins: " + whiteWins + "\nBlack Wins: " + blackWins +
-                        "\nDraws: " + draws);
+                double pValue = getPValue(currWins, draws, testWins);
+                IO.println("Curr Wins: " + currWins + " Test Wins: " + testWins +
+                        " Draws: " + draws + " P-Value: " + String.format("%.4f", pValue));
+                textRight.setText("Curr Wins: " + currWins + "\nTest Wins: " + testWins +
+                        "\nDraws: " + draws + "\nP-Value: " + String.format("%.4f", pValue));
+                if (testIdx >= 1000) {
+                    deepTest = false;
+                    testIdx = 0;
+                    whitePlayerHuman = true;
+                    blackPlayerHuman = true;
+                    currBot.setPrinting(true);
+                    testBot.setPrinting(true);
+                    btnDeepTest.setText("Deep Test");
+                    return;
+                }
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
-                gameState = FenUtils.getFenGameState(testIdx);
+                gameState = FenUtils.getFenGameState(testIdx / 2);
                 gameState.computeMoves();
                 makeBotMoveAsync();
             }
@@ -774,7 +823,7 @@ public class Main extends Application {
         }
         selectedSquare = -1;
         new Thread(() -> {
-            makeMove((gameState.getColor() == 1 ? whiteBot : blackBot)
+            makeMove((deepTest && gameState.getColor() == testIdx % 2 ? testBot : currBot)
                     .getMove(gameState, allottedTime));
             gameState.computeMoves();
             if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)

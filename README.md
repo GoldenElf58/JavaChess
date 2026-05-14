@@ -43,5 +43,5 @@ starting around line 93)
 - Right click for pencil markings (drag for arrows)
 - The text box lets you input an allotted time for the bot in seconds. It will set when you 
   press enter
-- White/Black Human/Bot toggles between whether each side is bot or human
+- White/Black Human/CurrBot toggles between whether each side is bot or human
 - BETA: Deep Test plays 500 games between the two bots to see which one is better

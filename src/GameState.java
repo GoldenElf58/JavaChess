@@ -92,7 +92,7 @@ public class GameState {
             else if (piece == 2) whiteKnights++;
             else if (piece == -3) blackBishops++;
             else if (piece == 3) whiteBishops++;
-            else otherPieces++;
+            else if (piece != 0) otherPieces++;
         }
         this.blackKnights = blackKnights;
         this.whiteKnights = whiteKnights;
@@ -136,7 +136,7 @@ public class GameState {
             else if (piece == 2) whiteKnights++;
             else if (piece == -3) blackBishops++;
             else if (piece == 3) whiteBishops++;
-            else otherPieces++;
+            else if (piece != 0) otherPieces++;
         }
         this.blackKnights = blackKnights;
         this.whiteKnights = whiteKnights;
