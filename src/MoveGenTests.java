@@ -41,10 +41,10 @@ public class MoveGenTests {
 
         double sec = (end - start) / 1e9;
 
-        System.out.println("====== Mutable ======");
-        System.out.println("Nodes: " + nodes);
-        System.out.println("Time: " + sec);
-        System.out.println("MNPS: " + ((int) (nodes / sec)) / 1_000_000.0);
+        IO.println("====== Mutable ======");
+        IO.println("Nodes: " + nodes);
+        IO.println("Time: " + sec);
+        IO.println("MNPS: " + ((int) (nodes / sec)) / 1_000_000.0);
     }
 
     @Test
@@ -59,10 +59,10 @@ public class MoveGenTests {
 
         double sec = (end - start) / 1e9;
 
-        System.out.println("===== Immutable =====");
-        System.out.println("Nodes: " + nodes);
-        System.out.println("Time: " + sec);
-        System.out.println("MNPS: " + ((int) (nodes / sec)) / 1_000_000.0);
+        IO.println("===== Immutable =====");
+        IO.println("Nodes: " + nodes);
+        IO.println("Time: " + sec);
+        IO.println("MNPS: " + ((int) (nodes / sec)) / 1_000_000.0);
     }
 
     @Test

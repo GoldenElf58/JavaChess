@@ -157,7 +157,7 @@ public class Main extends Application {
                     gameState.computeMoves();
                     if (Main.debug) {
                         if (Main.verbose) {
-                            System.out.println(gameState);
+                            IO.println(gameState);
                             gameState.printMoves();
                         }
                         System.out.printf("Half moves: %,d%n", movesThisGame);
@@ -185,7 +185,7 @@ public class Main extends Application {
                 gameState.computeMoves();
                 if (Main.debug) {
                     if (Main.verbose) {
-                        System.out.println(gameState);
+                        IO.println(gameState);
                         gameState.printMoves();
                     }
                     System.out.printf("Half moves: %,d%n", movesThisGame);
@@ -212,7 +212,7 @@ public class Main extends Application {
             newWatch.reset();
         }
         watch.stop();
-        System.out.println("\n");
+        IO.println("\n");
         System.out.printf("Max depth: %d%n", maxDepth);
         System.out.printf("Use Bot 1: %b%n", useBot1);
         System.out.printf("Use Bot 1: %b%n", useTestBot);
@@ -343,7 +343,7 @@ public class Main extends Application {
         allottedTimeTF.deselect();
         allottedTimeTF.setOnAction(_ -> {
             if (!deepTest) allottedTime = Double.parseDouble(allottedTimeTF.getText());
-            System.out.println("Alloted Time Set To: " + time((long) (allottedTime * 1e9), 3));
+            IO.println("Allotted Time Set To: " + time((long) (allottedTime * 1e9), 3));
         });
         allottedTimeTF.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ESCAPE) scene.getRoot().requestFocus();
@@ -438,8 +438,8 @@ public class Main extends Application {
 
         if (!gameState.isInProgress() && !shown) {
             SoundHandler.playSound("game-end");
-            System.out.println(gameState);
-            System.out.println((switch (gameState.getWinner()) {
+            IO.println(gameState);
+            IO.println((switch (gameState.getWinner()) {
                 case 0 -> "Draw";
                 case 1 -> "White wins";
                 case -1 -> "Black wins";
@@ -829,11 +829,11 @@ public class Main extends Application {
             btnDeepTest.setTranslateY(height / 2 + 60);
         }
         if (width < 292 - 28) {
-            System.out.println(width + " " + height);
+            IO.println(width + " " + height);
             width = 292 - 28;
         }
         if (height < 292 - 28) {
-            System.out.println(width + " " + height);
+            IO.println(width + " " + height);
             height = 292 - 28;
             length = height / 8;
         }

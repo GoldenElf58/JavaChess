@@ -203,9 +203,9 @@ public class GameState {
             if (move[0] == -1) {
                 byte throughIdx = (byte) (currKingIdx + move[2]);
                 kingIdx = (byte) (throughIdx + move[2]);
-                if (isAttackingOrthagonally(kingIdx, color)
-                        || isAttackingOrthagonally(currKingIdx, color)
-                        || isAttackingOrthagonally(throughIdx, color)) illegal = true;
+                if (isAttackingOrthogonally(kingIdx, color)
+                        || isAttackingOrthogonally(currKingIdx, color)
+                        || isAttackingOrthogonally(throughIdx, color)) illegal = true;
                 else if (isAttackingDiagonally(kingIdx, color)
                         || isAttackingDiagonally(currKingIdx, color)
                         || isAttackingDiagonally(throughIdx, color)) illegal = true;
@@ -242,7 +242,7 @@ public class GameState {
         moveCount = newMoveCount;
     }
 
-    private boolean isAttackingOrthagonally(byte kingIdx, byte color) {
+    private boolean isAttackingOrthogonally(byte kingIdx, byte color) {
         byte piece, target;
         target = kingIdx;
         piece = 0;
@@ -415,7 +415,7 @@ public class GameState {
 
     public boolean inCheck() {
         byte kingIdx = getKingIdx();
-        if (isAttackingOrthagonally(kingIdx, color)) return true;
+        if (isAttackingOrthogonally(kingIdx, color)) return true;
         else if (isAttackingDiagonally(kingIdx, color)) return true;
         else if (isAttackedByPawn(kingIdx, color)) return true;
         else if (isAttackedByKnight(kingIdx, color)) return true;

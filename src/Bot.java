@@ -80,24 +80,24 @@ public class Bot {
         }
         if (log) {
             if (!new File("depths.txt").exists()) {
-                System.out.println("Creating file depths.txt");
+                IO.println("Creating file depths.txt");
                 try {
                     if (!new File("depths.txt").createNewFile())
-                        System.out.println("Failed to create file depths.txt");
+                        IO.println("Failed to create file depths.txt");
                 } catch (IOException e) {
-                    System.out.println("Failed to create file depths.txt");
+                    IO.println("Failed to create file depths.txt");
                 }
             }
             try (PrintWriter writer = new PrintWriter(new FileWriter("depths.txt", true))) {
                 writer.println(depth[0]);
             } catch (IOException e) {
-                System.out.println("Failed to append to file depths.txt");
+                IO.println("Failed to append to file depths.txt");
             }
         }
         if (print) {
-            System.out.println("Depth: " + depth[0]);
-            System.out.println("Score: " + score);
-            System.out.println("Time: " + watch.getElapsedTimeMillis() / 1000d + "s");
+            IO.println("Depth: " + depth[0]);
+            IO.println("Score: " + score);
+            IO.println("Time: " + watch.getElapsedTimeMillis() / 1000d + "s");
         }
         clearCache();
         return move[0];
@@ -118,23 +118,23 @@ public class Bot {
         }
         if (log) {
             if (!new File("depths.txt").exists()) {
-                System.out.println("Creating file depths.txt");
+                IO.println("Creating file depths.txt");
                 try {
                     if (!new File("depths.txt").createNewFile())
-                        System.out.println("Failed to create file depths.txt");
+                        IO.println("Failed to create file depths.txt");
                 } catch (IOException e) {
-                    System.out.println("Failed to create file depths.txt");
+                    IO.println("Failed to create file depths.txt");
                 }
             }
             try (PrintWriter writer = new PrintWriter(new FileWriter("depths.txt", true))) {
                 writer.println(depth);
             } catch (IOException e) {
-                System.out.println("Failed to append to file depths.txt");
+                IO.println("Failed to append to file depths.txt");
             }
         }
         if (print) {
-            System.out.println("Depth: " + depth);
-            System.out.println("Score: " + score);
+            IO.println("Depth: " + depth);
+            IO.println("Score: " + score);
         }
         clearCache();
         return move;
