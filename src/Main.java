@@ -15,14 +15,20 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.*;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
+import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.*;
 
-import static java.lang.Math.*;
+import static java.lang.Math.floorDiv;
+import static java.lang.Math.round;
 
 public class Main extends Application {
 
@@ -74,6 +80,7 @@ public class Main extends Application {
 
     private Button btnWhitePlayer, btnBlackPlayer, btnDeepTest;
     private TextField tfAllottedTime;
+    private Text textRight;
 
     private final double[] mousePose = {-1, -1};
     private int specialStartSquare = -1;
@@ -283,7 +290,7 @@ public class Main extends Application {
 
         pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
-        gameState = FenUtils.getFenGameState(0);
+        gameState = new GameState();
         gameStateHistory = new Stack<>();
         gameStateFuture = new Stack<>();
         moveHistory = new Stack<>();
@@ -295,6 +302,7 @@ public class Main extends Application {
         root.getChildren().add(btnBlackPlayer = getWhitePlayerButton());
         root.getChildren().add(btnWhitePlayer = getBlackPlayerButton());
         root.getChildren().add(btnDeepTest = getDeepTestButton());
+        root.getChildren().add(textRight = getTextRight());
 
         stage.setScene(scene);
         stage.show();
@@ -405,13 +413,24 @@ public class Main extends Application {
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
+                textRight.setText("White Wins: 0\nBlack Wins: 0\nDraws: 0");
                 gameState = FenUtils.getFenGameState(testIdx);
                 gameState.computeMoves();
                 makeBotMoveAsync();
-            }
+            } else textRight.setText("");
         });
         deepTest.setOnMousePressed(_ -> deepTest.setStyle(btnClickStyle));
         return deepTest;
+    }
+
+    private @NotNull Text getTextRight() {
+        Text text = new Text();
+        text.setTranslateX(610);
+        text.setTranslateY(25);
+        text.setWrappingWidth(100);
+        text.setFill(Color.WHITE);
+        text.setFont(new Font(16));
+        return text;
     }
 
     public void loop() {
@@ -729,7 +748,7 @@ public class Main extends Application {
         gameStateFuture.clear();
         moveHistory.add(move);
         gameState = gameState.makeMove(move);
-        SoundHandler.playSound(move, gameStateHistory.getLast(), gameState);
+        if (!deepTest) SoundHandler.playSound(move, gameStateHistory.getLast(), gameState);
         gameState.computeMoves();
     }
 
@@ -742,6 +761,8 @@ public class Main extends Application {
                 testIdx++;
                 IO.println("White Wins: " + whiteWins + " Black Wins: " + blackWins +
                         " Draws: " + draws);
+                textRight.setText("White Wins: " + whiteWins + "\nBlack Wins: " + blackWins +
+                        "\nDraws: " + draws);
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
