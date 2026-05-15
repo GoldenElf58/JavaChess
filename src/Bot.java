@@ -6,4 +6,6 @@ public interface Bot {
     int getMove(GameState state, double allottedTime);
 
     int iterativeDeepening(GameState state, int maxDepth);
+
+    int getLastDepth();
 }

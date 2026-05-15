@@ -93,6 +93,11 @@ public class Main extends Application {
     private boolean command = false;
     private boolean shift = false;
     private volatile boolean appOpen = true;
+    private double pValue;
+    private int totalCurrDepth = 0;
+    private int totalTestDepth = 0;
+    private int totalCurrMoves = 0;
+    private int totalTestMoves = 0;
 
     // ==============================
     // Parameters
@@ -291,7 +296,7 @@ public class Main extends Application {
 
         pencilImage = new WritableImage(3840, 2160);
         pencilScene.snapshot(pencilImage);
-        gameState = FenUtils.getFenGameState(0);
+        gameState = new GameState();
         gameStateHistory = new Stack<>();
         gameStateFuture = new Stack<>();
         moveHistory = new Stack<>();
@@ -789,15 +794,11 @@ public class Main extends Application {
     private void makeBotMoveAsync() {
         if (!gameState.isInProgress() || !appOpen) {
             if (deepTest) {
-                if (gameState.getWinner() == 1) {
-                    if (testIdx % 2 == 0) currWins++;
-                    if (testIdx % 2 == 1) testWins++;
-                } else if (gameState.getWinner() == -1) {
-                    if (testIdx % 2 == 0) testWins++;
-                    if (testIdx % 2 == 1) currWins++;
-                } else draws++;
+                if (gameState.getWinner() == 2 * (testIdx % 2) - 1) testWins++;
+                else if (gameState.getWinner() != 0) currWins++;
+                else draws++;
                 testIdx++;
-                double pValue = getPValue(currWins, draws, testWins);
+                pValue = getPValue(currWins, draws, testWins);
                 IO.println("Curr Wins: " + currWins + " Test Wins: " + testWins +
                         " Draws: " + draws + " P-Value: " + String.format("%.4f", pValue));
                 textRight.setText("Curr Wins: " + currWins + "\nTest Wins: " + testWins +
@@ -823,8 +824,30 @@ public class Main extends Application {
         }
         selectedSquare = -1;
         new Thread(() -> {
-            makeMove((deepTest && gameState.getColor() == testIdx % 2 ? testBot : currBot)
-                    .getMove(gameState, allottedTime));
+            makeMove((deepTest && (gameState.getColor() == 2 * (testIdx % 2) - 1) ? testBot :
+                    currBot).getMove(gameState, allottedTime));
+            if (gameState.getColor() == 2 * (testIdx % 2) - 1) {
+                totalCurrDepth += currBot.getLastDepth();
+                totalCurrMoves++;
+            } else {
+                totalTestDepth += testBot.getLastDepth();
+                totalTestMoves++;
+            }
+            textRight.setText(String.format("""
+                            Curr Wins: %s
+                            Test Wins: %s
+                            Draws: %s
+                            P-Value: %.4f
+                            
+                            Curr Depth: %.2f
+                            Test Depth: %.2f
+                            Curr Color: %s
+                            Test Color: %s""",
+                    currWins, testWins, draws, pValue,
+                    (double) totalCurrDepth / totalCurrMoves,
+                    (double) totalTestDepth / totalTestMoves,
+                    2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
+                    2 * (testIdx % 2) - 1 == 1 ? "White" : "Black"));
             gameState.computeMoves();
             if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
                 makeBotMoveAsync();
@@ -862,11 +885,13 @@ public class Main extends Application {
             btnWhitePlayer.setVisible(false);
             btnBlackPlayer.setVisible(false);
             btnDeepTest.setVisible(false);
+            textRight.setVisible(false);
         } else {
             tfAllottedTime.setVisible(true);
             btnWhitePlayer.setVisible(true);
             btnBlackPlayer.setVisible(true);
             btnDeepTest.setVisible(true);
+            textRight.setVisible(true);
             double x = (width - height) / 2 - 110;
             tfAllottedTime.setTranslateX(x);
             btnWhitePlayer.setTranslateX(x);
@@ -876,6 +901,7 @@ public class Main extends Application {
             btnWhitePlayer.setTranslateY(height / 2 - 40);
             btnBlackPlayer.setTranslateY(height / 2 + 10);
             btnDeepTest.setTranslateY(height / 2 + 60);
+            textRight.setTranslateX((width - height) / 2 + height + 10);
         }
         if (width < 292 - 28) {
             IO.println(width + " " + height);

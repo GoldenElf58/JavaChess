@@ -14,6 +14,7 @@ public class CurrBot implements Bot {
     private final TTEntry emptyTT = new TTEntry();
     private MutableGameState[][] pools = new MutableGameState[10][218];
     private volatile boolean stopSearch = false;
+    private int lastDepth;
 
     private static class TTEntry {
         int score;
@@ -45,6 +46,10 @@ public class CurrBot implements Bot {
 
     public int getMove(GameState state, double allottedTime) {
         return iterativeDeepening(state, allottedTime);
+    }
+
+    public int getLastDepth() {
+        return lastDepth;
     }
 
     private int iterativeDeepening(GameState state, double allottedTime) {
@@ -100,6 +105,7 @@ public class CurrBot implements Bot {
             IO.println("Time: " + watch.getElapsedTimeMillis() / 1000d + "s");
         }
         clearCache();
+        lastDepth = depth[0];
         return move[0];
     }
 
@@ -137,6 +143,7 @@ public class CurrBot implements Bot {
             IO.println("Score: " + score);
         }
         clearCache();
+        lastDepth = depth;
         return move;
     }
 
@@ -169,7 +176,8 @@ public class CurrBot implements Bot {
         }
 
         MutableGameState nextState;
-        if (depth > pools.length) pools = new MutableGameState[pools.length * 2][218];
+        if (depth + 1 >= pools.length)
+            pools = new MutableGameState[Math.max(depth, pools.length * 2) + 1][218];
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
             nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);

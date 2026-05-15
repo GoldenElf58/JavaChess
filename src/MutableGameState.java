@@ -17,6 +17,7 @@ public class MutableGameState {
     private byte[] newMoves;
     private int moveCount;
     private boolean movesGenerated;
+    private boolean onlyCapturesGenerated;
     private boolean isWinner;
     private byte winner;
     private byte blackKnights;
@@ -69,6 +70,7 @@ public class MutableGameState {
         this.canEnPassant = canEnPassant;
         this.moveCount = 0;
         this.movesGenerated = false;
+        this.onlyCapturesGenerated = false;
         this.lastMutatingMoveIdx = -1;
         this.lastMutatingPieceTaken = -1;
         this.evaluation = evaluation;
@@ -144,6 +146,53 @@ public class MutableGameState {
         moves = newMoves;
         newMoves = tmp;
         movesGenerated = true;
+        onlyCapturesGenerated = false;
+        moveCount = newMoveCount;
+    }
+
+    public void computeMovesOnlyCaptures() {
+        if (onlyCapturesGenerated) return;
+        computeMovesPseudoLegalOnlyCaptures();
+        byte pieceTaken;
+        boolean illegal;
+        if (newMoves == null) newMoves = new byte[654];
+        int newMoveCount = 0;
+        int idx;
+        byte currKingIdx = getKingIdx();
+        byte kingIdx, move_0, move_1, move_2;
+        boolean kingMoved, override;
+        if (currKingIdx == -1) return;
+        boolean inCheck = inCheck();
+        boolean inCheckByNonSlidingPiece = inCheckByNonSlidingPiece(currKingIdx, color);
+        for (byte moveIdx = 0; moveIdx < moveCount; moveIdx++) {
+            idx = moveIdx * 3;
+            move_0 = moves[idx];
+            move_1 = moves[idx + 1];
+            move_2 = moves[idx + 2];
+            pieceTaken = makeMoveOnlyBoard(move_0, move_1, move_2);
+            illegal = false;
+            kingMoved = move_0 >= 0 && abs(board[move_1]) == 6;
+            kingIdx = kingMoved ? move_1 : currKingIdx;
+            override = kingMoved || inCheck || move_0 < 0;
+            if (isAttackingSliding(kingIdx, color, move_0, move_1, override)) illegal = true;
+            else if (kingMoved || inCheckByNonSlidingPiece) {
+                if (isAttackedByPawn(kingIdx, color)) illegal = true;
+                else if (isAttackedByKnight(kingIdx, color)) illegal = true;
+                else if (isAttackedByKing(kingIdx, color)) illegal = true;
+            }
+            undoMoveOnlyBoard(move_0, move_1, move_2, pieceTaken);
+            if (!illegal) {
+                newMoves[newMoveCount * 3] = move_0;
+                newMoves[newMoveCount * 3 + 1] = move_1;
+                newMoves[newMoveCount * 3 + 2] = move_2;
+                newMoveCount++;
+            }
+        }
+        byte[] tmp = moves;
+        moves = newMoves;
+        newMoves = tmp;
+        movesGenerated = false;
+        onlyCapturesGenerated = true;
         moveCount = newMoveCount;
     }
 
@@ -307,6 +356,36 @@ public class MutableGameState {
                     break;
                 case 6:
                     addMovesForKing(i);
+                    break;
+            }
+        }
+    }
+
+    public void computeMovesPseudoLegalOnlyCaptures() {
+        if (moves == null) moves = new byte[654]; // 218 * 3
+        moveCount = 0;
+        byte pieceType;
+        for (byte i = 0; i < 64; i++) {
+            pieceType = (byte) (board[i] * color);
+            if (pieceType <= 0) continue;
+            switch (pieceType) {
+                case 1:
+                    addMovesForPawnOnlyCaptures(i);
+                    break;
+                case 2:
+                    addMovesForKnightOnlyCaptures(i);
+                    break;
+                case 3:
+                    addMovesForBishopOnlyCaptures(i);
+                    break;
+                case 4:
+                    addMovesForRookOnlyCaptures(i);
+                    break;
+                case 5:
+                    addMovesForQueenOnlyCaptures(i);
+                    break;
+                case 6:
+                    addMovesForKingOnlyCaptures(i);
                     break;
             }
         }
@@ -996,6 +1075,111 @@ public class MutableGameState {
                 }
             }
         }
+
+        // Capture Left
+        if (((forwardSquare - 1) & 7) != 7 && board[forwardSquare - 1] * color < 0) {
+            if (isPromotion) {
+                addMoveSlot((byte) -7, i, (byte) (forwardSquare - 1)); // Queen
+                addMoveSlot((byte) -6, i, (byte) (forwardSquare - 1)); // Rook
+                addMoveSlot((byte) -5, i, (byte) (forwardSquare - 1)); // Bishop
+                addMoveSlot((byte) -4, i, (byte) (forwardSquare - 1)); // Knight
+            } else {
+                addMoveSlot(i, (byte) (forwardSquare - 1));
+            }
+        }
+
+        // Capture Right
+        if (((forwardSquare + 1) & 7) != 0 && board[forwardSquare + 1] * color < 0) {
+            if (isPromotion) {
+                addMoveSlot((byte) -7, i, (byte) (forwardSquare + 1)); // Queen
+                addMoveSlot((byte) -6, i, (byte) (forwardSquare + 1)); // Rook
+                addMoveSlot((byte) -5, i, (byte) (forwardSquare + 1)); // Bishop
+                addMoveSlot((byte) -4, i, (byte) (forwardSquare + 1)); // Knight
+            } else {
+                addMoveSlot(i, (byte) (forwardSquare + 1));
+            }
+        }
+
+        // En Passant
+        if (enPassantIdx != -1 && canEnPassant) {
+            if ((enPassantIdx & 7) == (i & 7) - 1 && enPassantIdx == i - 1) { // Left
+                addMoveSlot((byte) -3, i, (byte) -1);
+            } else if ((enPassantIdx & 7) == (i & 7) + 1 && enPassantIdx == i + 1) { // Right
+                addMoveSlot((byte) -3, i, (byte) 1);
+            }
+        }
+    }
+
+    private void addMovesForKingOnlyCaptures(byte i) {
+        byte idxMod8 = (byte) (i & 7);
+        for (byte j = -1; j <= 1; j++) {
+            for (byte k = -1; k <= 1; k++) {
+                byte destination = (byte) (i + j * 8 + k);
+                if (idxMod8 + k == (destination & 7) && 0 <= destination && destination < 64 &&
+                        board[destination] * color < 0) {
+                    addMoveSlot(i, destination);
+                }
+            }
+        }
+    }
+
+    private void addSlidingMovesOnlyCaptures(byte i, byte direction1, byte direction2) {
+        byte idxMod8 = (byte) (i & 7);
+        byte idxDiv8 = (byte) (i / 8);
+        for (byte j = 1; j < 8; j++) {
+            byte target = (byte) (i + direction1 * j + direction2 * j * 8);
+            if (!(0 <= target && target < 64 && (target & 7) == idxMod8 + direction1 * j &&
+                    target / 8 == idxDiv8 + direction2 * j)) break;
+            byte targetPieceType = (byte) (board[target] * color);
+            if (targetPieceType == 0) continue;
+            if (targetPieceType < 0) addMoveSlot(i, target);
+            break;
+        }
+    }
+
+    private void addMovesForQueenOnlyCaptures(byte i) {
+        addSlidingMovesOnlyCaptures(i, (byte) 1, (byte) 1);
+        addSlidingMovesOnlyCaptures(i, (byte) 1, (byte) -1);
+        addSlidingMovesOnlyCaptures(i, (byte) -1, (byte) 1);
+        addSlidingMovesOnlyCaptures(i, (byte) -1, (byte) -1);
+        addSlidingMovesOnlyCaptures(i, (byte) 1, (byte) 0);
+        addSlidingMovesOnlyCaptures(i, (byte) -1, (byte) 0);
+        addSlidingMovesOnlyCaptures(i, (byte) 0, (byte) 1);
+        addSlidingMovesOnlyCaptures(i, (byte) 0, (byte) -1);
+    }
+
+    private void addMovesForRookOnlyCaptures(byte i) {
+        addSlidingMovesOnlyCaptures(i, (byte) 1, (byte) 0);
+        addSlidingMovesOnlyCaptures(i, (byte) -1, (byte) 0);
+        addSlidingMovesOnlyCaptures(i, (byte) 0, (byte) 1);
+        addSlidingMovesOnlyCaptures(i, (byte) 0, (byte) -1);
+    }
+
+    private void addMovesForBishopOnlyCaptures(byte i) {
+        addSlidingMovesOnlyCaptures(i, (byte) 1, (byte) 1);
+        addSlidingMovesOnlyCaptures(i, (byte) 1, (byte) -1);
+        addSlidingMovesOnlyCaptures(i, (byte) -1, (byte) 1);
+        addSlidingMovesOnlyCaptures(i, (byte) -1, (byte) -1);
+    }
+
+    private void addMovesForKnightOnlyCaptures(byte i) {
+        byte idxMod8 = (byte) (i & 7);
+        byte target;
+        for (byte j = -2; j <= 2; j += 4) {
+            for (byte k = -1; k <= 1; k += 2) {
+                target = (byte) (i + j * 8 + k);
+                if (idxMod8 + k == (target & 7) && 0 <= target && target < 64
+                        && board[target] * color < 0) addMoveSlot(i, target);
+                target = (byte) (i + j + k * 8);
+                if (idxMod8 + j == (target & 7) && 0 <= target && target < 64
+                        && board[target] * color < 0) addMoveSlot(i, target);
+            }
+        }
+    }
+
+    private void addMovesForPawnOnlyCaptures(byte i) {
+        byte forwardSquare = (byte) (i - 8 * color);
+        boolean isPromotion = whiteMove ? i / 8 == 1 : i / 8 == 6;
 
         // Capture Left
         if (((forwardSquare - 1) & 7) != 7 && board[forwardSquare - 1] * color < 0) {
