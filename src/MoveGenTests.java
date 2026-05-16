@@ -1,3 +1,5 @@
+import game.GameState;
+import game.MutableGameState;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

@@ -1,3 +1,5 @@
+package app;
+
 import javafx.scene.paint.Color;
 
 public class Colors {

@@ -1,3 +1,10 @@
+package bot.archive;
+
+import utils.Watch;
+import eval.Bot;
+import game.GameState;
+import game.MutableGameState;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -5,7 +12,8 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class CurrBot implements Bot {
+
+public class BotV1Quiescence implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -13,6 +21,7 @@ public class CurrBot implements Bot {
     private boolean print;
     private final TTEntry emptyTT = new TTEntry();
     private MutableGameState[][] pools = new MutableGameState[10][218];
+    private final MutableGameState[][] capturePools = new MutableGameState[10][78];
     private volatile boolean stopSearch = false;
     private int lastDepth;
 
@@ -27,7 +36,7 @@ public class CurrBot implements Bot {
         }
     }
 
-    public CurrBot(boolean log, boolean print) {
+    public BotV1Quiescence(boolean log, boolean print) {
         this.log = log;
         this.print = print;
     }
@@ -197,7 +206,7 @@ public class CurrBot implements Bot {
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
         if (stopSearch) throw new StopSearchException();
-        if (depth == maxDepth) return evaluate(state);
+        if (depth >= maxDepth) return minimaxCapturesOnly(state, 1, isMaximizing, alpha, beta);
         long hashKey = state.getHash();
         TTEntry thisEntry;
         if (moveCache.containsKey(hashKey)) {
@@ -241,17 +250,16 @@ public class CurrBot implements Bot {
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
-        MutableGameState nextState = null;
+        MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) {
                 state.makeMoveOnlyBoard(moveSearchOrder[i]);
                 nextState = nextStates[moveSearchOrder[i]];
-            } else if (depth + 1 != maxDepth) {
-                if (pools[depth][i] != null) nextState = state.loadMoveTo(pools[depth][i], i);
-                else pools[depth][i] = nextState = state.makeMove(i);
-            } else state.makeMoveOnlyBoardEval(i);
-            if (depth + 1 == maxDepth) score = state.getCurEval();
-            else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
+            } else {
+                if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], i);
+                else pools[depth][0] = nextState = state.makeMove(i);
+            }
+            score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
@@ -266,6 +274,71 @@ public class CurrBot implements Bot {
         thisEntry.score = bestScore;
         thisEntry.depthRemaining = maxDepth - depth;
         moveCache.put(hashKey, thisEntry);
+        return bestScore;
+    }
+
+    private int minimaxCapturesOnly(MutableGameState state, int depth, boolean isMaximizing,
+                                    int alpha, int beta) {
+        if (stopSearch) throw new StopSearchException();
+        if (depth >= 3) return evaluate(state);
+        int standPat = evaluate(state);
+        if (isMaximizing) {
+            if (standPat >= beta) return standPat;
+            if (standPat + 900 < alpha) return standPat;
+            alpha = Math.max(alpha, standPat);
+        } else {
+            if (standPat <= alpha) return standPat;
+            if (standPat - 900 > beta) return standPat;
+            beta = Math.min(beta, standPat);
+        }
+        state.computeMovesOnlyCaptures();
+        if (state.getMoveCount() == 0) return evaluate(state);
+        if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
+
+        final Integer[] moveSearchOrder;
+        final MutableGameState[] nextStates;
+        boolean sortMoves = depth < 2;
+        if (sortMoves) {
+            moveSearchOrder = new Integer[state.getMoveCount()];
+            nextStates = new MutableGameState[state.getMoveCount()];
+            for (int i = 0; i < state.getMoveCount(); i++) {
+                moveSearchOrder[i] = i;
+                if (capturePools[depth - 1][i] != null)
+                    nextStates[i] = state.loadMoveTo(capturePools[depth - 1][i], i);
+                else nextStates[i] = capturePools[depth - 1][i] = state.makeMove(i);
+                state.undoMove();
+            }
+            Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
+                    (nextStates[m1].getEvaluation() - nextStates[m2].getEvaluation()));
+        } else {
+            nextStates = null;
+            moveSearchOrder = null;
+        }
+
+        int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
+        int score;
+        MutableGameState nextState;
+        for (int i = 0; i < state.getMoveCount(); i++) {
+            if (sortMoves) {
+                state.makeMoveOnlyBoard(moveSearchOrder[i]);
+                nextState = nextStates[moveSearchOrder[i]];
+            } else {
+                if (capturePools[depth - 1][0] != null)
+                    nextState = state.loadMoveTo(capturePools[depth - 1][0], i);
+                else capturePools[depth - 1][0] = nextState = state.makeMove(i);
+            }
+            score = minimaxCapturesOnly(nextState, depth + 1, !isMaximizing, alpha, beta);
+            state.undoMove();
+            if (isMaximizing ? score > bestScore : score < bestScore) {
+                bestScore = score;
+                if (isMaximizing) alpha = score;
+                else beta = score;
+                if (beta <= alpha) break;
+            }
+        }
+        if (isMaximizing ? bestScore >= Integer.MAX_VALUE / 2 - 256 :
+                bestScore <= -Integer.MAX_VALUE / 2 + 256)
+            bestScore -= (isMaximizing ? 1 : -1);
         return bestScore;
     }
 }

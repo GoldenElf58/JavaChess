@@ -1,3 +1,7 @@
+package eval;
+
+import static java.lang.Math.abs;
+
 public class PieceSquareTables {
     /**
      * Get the value of a piece on a square
@@ -19,6 +23,46 @@ public class PieceSquareTables {
             default -> throw new IllegalArgumentException("Invalid piece: " + piece);
         };
         return piece > 0 ? pieceTable[square] : -pieceTable[63 - square];
+    }
+
+    public static int getPieceSquareValueEndgame(int piece, int square) {
+        if (piece == 0) return 0;
+        int[] pieceTable = switch (piece) {
+            case -1, 1 -> PawnsEnd;
+            case -2, 2 -> Knights;
+            case -3, 3 -> Bishops;
+            case -4, 4 -> Rooks;
+            case -5, 5 -> Queens;
+            case -6, 6 -> KingEnd;
+            default -> throw new IllegalArgumentException("Invalid piece: " + piece);
+        };
+        return piece > 0 ? pieceTable[square] : -pieceTable[63 - square];
+    }
+
+    public static int convertToKingEndgame(byte[] board, int curEval) {
+        byte piece;
+        int eval = curEval;
+        for (int i = 0; i < 64; i++) {
+            piece = board[i];
+            if (abs(piece) == 6) {
+                eval -= getPieceSquareValue(piece, i);
+                eval += getPieceSquareValueEndgame(piece, i);
+            }
+        }
+        return eval;
+    }
+
+    public static int convertToEndgame(byte[] board, int curEval) {
+        byte piece;
+        int eval = curEval;
+        for (int i = 0; i < 64; i++) {
+            piece = board[i];
+            if (abs(piece) == 1 || abs(piece) == 6) {
+                eval -= getPieceSquareValue(piece, i);
+                eval += getPieceSquareValueEndgame(piece, i);
+            }
+        }
+        return eval;
     }
 
     public static final int[] Pawns = {

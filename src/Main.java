@@ -1,3 +1,11 @@
+import app.Arrow;
+import app.Colors;
+import app.SoundHandler;
+import eval.BotV3UsePartialSearch;
+import utils.Watch;
+import eval.BotVTest;
+import game.FenUtils;
+import game.GameState;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.collections.ObservableList;
@@ -27,8 +35,8 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.util.*;
 
-import static java.lang.Math.floorDiv;
-import static java.lang.Math.round;
+import static java.lang.Math.*;
+import static utils.Watch.time;
 
 public class Main extends Application {
 
@@ -80,7 +88,7 @@ public class Main extends Application {
 
     private Button btnWhitePlayer, btnBlackPlayer, btnDeepTest;
     private TextField tfAllottedTime;
-    private Text textRight;
+    private Text infoText;
 
     private final double[] mousePose = {-1, -1};
     private int specialStartSquare = -1;
@@ -121,13 +129,14 @@ public class Main extends Application {
     private static final boolean useBot1Move = true;
     private static final boolean useTestBotMove = false;
 
-    private final CurrBot currBot = new CurrBot(true, true);
-    private final TestBot testBot = new TestBot(true, true);
+    private final BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(true, true);
+    private final BotVTest testBot = new BotVTest(true, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
         if (runBenchmarkOnly) runBenchmark();
         else launch(args);
+        System.exit(0);
     }
 
     private static void runBenchmark() {
@@ -138,8 +147,8 @@ public class Main extends Application {
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
-        CurrBot currBot = new CurrBot(false, false);
-        TestBot testBot = new TestBot(false, false);
+        BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(false, false);
+        BotVTest testBot = new BotVTest(false, false);
         Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
@@ -223,8 +232,8 @@ public class Main extends Application {
         watch.stop();
         IO.println("\n");
         System.out.printf("Max depth: %d%n", maxDepth);
-        System.out.printf("Use Curr Bot: %b%n", useCurrBot);
-        System.out.printf("Use Test Bot: %b%n", useTestBot);
+        System.out.printf("Use Curr eval.Bot: %b%n", useCurrBot);
+        System.out.printf("Use Test eval.Bot: %b%n", useTestBot);
         System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
         System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
@@ -245,21 +254,6 @@ public class Main extends Application {
 
         System.out.printf("Average half-moves/game: %.2f%n", mean);
         System.out.printf("95%% CI (half-moves/game): (%.2f, %.2f)%n", ci[0], ci[1]);
-    }
-
-    public static String time(long time, int precision) {
-        String fmt = "%,." + precision + "g";
-        if (time < 1_000)
-            return String.format("%s ns", String.format(fmt, (double) time));
-        if (time < 1_000_000)
-            return String.format("%s µs", String.format(fmt, time / 1_000.0));
-        if (time < 1_000_000_000)
-            return String.format("%s ms", String.format(fmt, time / 1_000_000.0));
-        return String.format("%s s", String.format(fmt, time / 1_000_000_000.0));
-    }
-
-    public static String time(long time) {
-        return time(time, 5);
     }
 
     public static double[] confidenceInterval95(long[] data) {
@@ -289,7 +283,7 @@ public class Main extends Application {
 
         Group root = new Group();
         pencilMarkings = new Group();
-        scene = new Scene(root, 720, 480, Color.grayRgb(0));
+        scene = new Scene(root, 853, 480, Color.grayRgb(0));
         pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT,
                 Color.TRANSPARENT);
         SoundHandler.loadSounds();
@@ -308,7 +302,7 @@ public class Main extends Application {
         root.getChildren().add(btnBlackPlayer = getWhitePlayerButton());
         root.getChildren().add(btnWhitePlayer = getBlackPlayerButton());
         root.getChildren().add(btnDeepTest = getDeepTestButton());
-        root.getChildren().add(textRight = getTextRight());
+        root.getChildren().add(infoText = getInfoText());
 
         stage.setScene(scene);
         stage.show();
@@ -358,38 +352,50 @@ public class Main extends Application {
     }
 
     private @NotNull Button getBlackPlayerButton() {
-        Button blackPlayer = new Button(blackPlayerHuman ? "Black Human" : "Black Bot");
+        Button blackPlayer = new Button(blackPlayerHuman ? "Black Human" : "Black eval.Bot");
         blackPlayer.setTranslateX(10);
         blackPlayer.setTranslateY(200);
         blackPlayer.setPrefHeight(30);
         blackPlayer.setPrefWidth(100);
         blackPlayer.setStyle(btnStyle);
-        blackPlayer.setOnMouseEntered(_ -> blackPlayer.setStyle(btnHoverStyle));
-        blackPlayer.setOnMouseExited(_ -> blackPlayer.setStyle(btnStyle));
+        blackPlayer.setOnMouseEntered(_ -> {
+            blackPlayer.setStyle(btnHoverStyle);
+            scene.setCursor(Cursor.HAND);
+        });
+        blackPlayer.setOnMouseExited(_ -> {
+            blackPlayer.setStyle(btnStyle);
+            scene.setCursor(Cursor.DEFAULT);
+        });
         blackPlayer.setOnAction(_ -> {
             blackPlayer.setStyle(btnHoverStyle);
             if (!deepTest) blackPlayerHuman = !blackPlayerHuman;
             if (!blackPlayerHuman && gameState.getColor() == -1) makeBotMoveAsync();
-            blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black Bot");
+            blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black eval.Bot");
         });
         blackPlayer.setOnMousePressed(_ -> blackPlayer.setStyle(btnClickStyle));
         return blackPlayer;
     }
 
     private @NotNull Button getWhitePlayerButton() {
-        Button whitePlayer = new Button(whitePlayerHuman ? "White Human" : "White Bot");
+        Button whitePlayer = new Button(whitePlayerHuman ? "White Human" : "White eval.Bot");
         whitePlayer.setTranslateX(10);
         whitePlayer.setTranslateY(250);
         whitePlayer.setPrefHeight(30);
         whitePlayer.setPrefWidth(100);
         whitePlayer.setStyle(btnStyle);
-        whitePlayer.setOnMouseEntered(_ -> whitePlayer.setStyle(btnHoverStyle));
-        whitePlayer.setOnMouseExited(_ -> whitePlayer.setStyle(btnStyle));
+        whitePlayer.setOnMouseEntered(_ -> {
+            whitePlayer.setStyle(btnHoverStyle);
+            scene.setCursor(Cursor.HAND);
+        });
+        whitePlayer.setOnMouseExited(_ -> {
+            whitePlayer.setStyle(btnStyle);
+            scene.setCursor(Cursor.DEFAULT);
+        });
         whitePlayer.setOnAction(_ -> {
             whitePlayer.setStyle(btnHoverStyle);
             if (!deepTest) whitePlayerHuman = !whitePlayerHuman;
             if (!whitePlayerHuman && gameState.getColor() == 1) makeBotMoveAsync();
-            whitePlayer.setText(whitePlayerHuman ? "White Human" : "White Bot");
+            whitePlayer.setText(whitePlayerHuman ? "White Human" : "White eval.Bot");
         });
         whitePlayer.setOnMousePressed(_ -> whitePlayer.setStyle(btnClickStyle));
         return whitePlayer;
@@ -402,8 +408,14 @@ public class Main extends Application {
         deepTest.setPrefHeight(30);
         deepTest.setPrefWidth(100);
         deepTest.setStyle(btnStyle);
-        deepTest.setOnMouseEntered(_ -> deepTest.setStyle(btnHoverStyle));
-        deepTest.setOnMouseExited(_ -> deepTest.setStyle(btnStyle));
+        deepTest.setOnMouseEntered(_ -> {
+            deepTest.setStyle(btnHoverStyle);
+            scene.setCursor(Cursor.HAND);
+        });
+        deepTest.setOnMouseExited(_ -> {
+            deepTest.setStyle(btnStyle);
+            scene.setCursor(Cursor.DEFAULT);
+        });
         deepTest.setOnAction(_ -> {
             deepTest.setStyle(btnHoverStyle);
             Main.deepTest = !Main.deepTest;
@@ -424,24 +436,43 @@ public class Main extends Application {
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
-                textRight.setText("White Wins: 0\nBlack Wins: 0\nDraws: 0\nP-Value: 1.0000");
+                infoText.setText("White Wins: 0\nBlack Wins: 0\nDraws: 0\nP-Value: 1.0000");
                 gameState = FenUtils.getFenGameState(testIdx);
                 gameState.computeMoves();
                 makeBotMoveAsync();
-            } else textRight.setText("");
+            } else infoText.setText("");
         });
         deepTest.setOnMousePressed(_ -> deepTest.setStyle(btnClickStyle));
         return deepTest;
     }
 
-    private @NotNull Text getTextRight() {
-        Text text = new Text();
-        text.setTranslateX(610);
-        text.setTranslateY(25);
-        text.setWrappingWidth(100);
-        text.setFill(Color.WHITE);
-        text.setFont(new Font(14));
-        return text;
+    private @NotNull Text getInfoText() {
+        Text infoText = new Text();
+        infoText.setTranslateX(610);
+        infoText.setTranslateY(25);
+        infoText.setWrappingWidth(100);
+        infoText.setFill(Color.WHITE);
+        infoText.setFont(new Font(14));
+        return infoText;
+    }
+
+    private void updateInfoText() {
+        if (!deepTest) return;
+        infoText.setText(String.format("""
+                            Curr Wins: %s
+                            Test Wins: %s
+                            Draws: %s
+                            P-Value: %.4f
+                            
+                            Curr Depth: %.2f
+                            Test Depth: %.2f
+                            Curr Color: %s
+                            Test Color: %s""",
+                currWins, testWins, draws, pValue,
+                (double) totalCurrDepth / totalCurrMoves,
+                (double) totalTestDepth / totalTestMoves,
+                2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
+                2 * (testIdx % 2) - 1 == 1 ? "White" : "Black"));
     }
 
     public void loop() {
@@ -614,13 +645,13 @@ public class Main extends Application {
     private void onMouseClicked(MouseEvent e) {
         scene.getRoot().requestFocus();
         int currSquare = getSquare(scene, (int) e.getX(), (int) e.getY());
-        double length = scene.getHeight() / 8;
+        double length = min(scene.getWidth(), scene.getHeight()) / 8;
         if (e.getButton() == MouseButton.SECONDARY) {
             ObservableList<Node> children = pencilMarkings.getChildren();
             if (children.isEmpty()) return;
             if (children.getLast() instanceof Group) {
                 children.removeLast();
-                double offset = scene.getHeight() / 16;
+                double offset = min(scene.getWidth(), scene.getHeight()) / 16;
                 if (currSquare == specialStartSquare) {
                     Circle circle = new Circle(getX(scene, currSquare) + offset,
                             getY(scene, currSquare) + offset,
@@ -800,9 +831,10 @@ public class Main extends Application {
                 testIdx++;
                 pValue = getPValue(currWins, draws, testWins);
                 IO.println("Curr Wins: " + currWins + " Test Wins: " + testWins +
-                        " Draws: " + draws + " P-Value: " + String.format("%.4f", pValue));
-                textRight.setText("Curr Wins: " + currWins + "\nTest Wins: " + testWins +
-                        "\nDraws: " + draws + "\nP-Value: " + String.format("%.4f", pValue));
+                        " Draws: " + draws + " P-Value: " + String.format("%.4f", pValue) +
+                        " Curr Depth: " + currBot.getLastDepth() +
+                        " Test Depth: " + testBot.getLastDepth());
+                updateInfoText();
                 if (testIdx >= 1000) {
                     deepTest = false;
                     testIdx = 0;
@@ -833,21 +865,7 @@ public class Main extends Application {
                 totalTestDepth += testBot.getLastDepth();
                 totalTestMoves++;
             }
-            textRight.setText(String.format("""
-                            Curr Wins: %s
-                            Test Wins: %s
-                            Draws: %s
-                            P-Value: %.4f
-                            
-                            Curr Depth: %.2f
-                            Test Depth: %.2f
-                            Curr Color: %s
-                            Test Color: %s""",
-                    currWins, testWins, draws, pValue,
-                    (double) totalCurrDepth / totalCurrMoves,
-                    (double) totalTestDepth / totalTestMoves,
-                    2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
-                    2 * (testIdx % 2) - 1 == 1 ? "White" : "Black"));
+            updateInfoText();
             gameState.computeMoves();
             if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
                 makeBotMoveAsync();
@@ -879,19 +897,19 @@ public class Main extends Application {
     public void updatePositions() {
         double width = scene.getWidth();
         double height = scene.getHeight();
-        double length = height / 8;
+        double length = Math.min(width, height) / 8;
         if ((width - height) / 2 < 120) {
             tfAllottedTime.setVisible(false);
             btnWhitePlayer.setVisible(false);
             btnBlackPlayer.setVisible(false);
             btnDeepTest.setVisible(false);
-            textRight.setVisible(false);
+            infoText.setVisible(false);
         } else {
             tfAllottedTime.setVisible(true);
             btnWhitePlayer.setVisible(true);
             btnBlackPlayer.setVisible(true);
             btnDeepTest.setVisible(true);
-            textRight.setVisible(true);
+            infoText.setVisible(true);
             double x = (width - height) / 2 - 110;
             tfAllottedTime.setTranslateX(x);
             btnWhitePlayer.setTranslateX(x);
@@ -901,7 +919,10 @@ public class Main extends Application {
             btnWhitePlayer.setTranslateY(height / 2 - 40);
             btnBlackPlayer.setTranslateY(height / 2 + 10);
             btnDeepTest.setTranslateY(height / 2 + 60);
-            textRight.setTranslateX((width - height) / 2 + height + 10);
+            infoText.setTranslateX((width - height) / 2 + height + 10);
+            infoText.setWrappingWidth(clamp((width - height) / 2 - 20, 100,
+                    clamp(120 * height / 480, 120, 220)));
+            infoText.setFont(new Font(clamp(height / 480 * 14, 12, 20)));
         }
         if (width < 292 - 28) {
             IO.println(width + " " + height);
@@ -919,7 +940,7 @@ public class Main extends Application {
         borders[1].setX(width - (width - height) / 2);
         for (int i = 0; i < 64; i++) {
             double x = getX(width, height, i);
-            double y = getY(height, i);
+            double y = getY(width, height, i);
             Rectangle sq = squares[i];
             sq.setWidth(length);
             sq.setHeight(length);
@@ -937,7 +958,7 @@ public class Main extends Application {
                 int square = getSquare(previousWidth, previousHeight,
                         (int) ((Circle) child).getCenterX(), (int) ((Circle) child).getCenterY());
                 ((Circle) child).setCenterX(getX(width, height, square) + length / 2);
-                ((Circle) child).setCenterY(getY(height, square) + length / 2);
+                ((Circle) child).setCenterY(getY(width, height, square) + length / 2);
                 ((Circle) child).setStrokeWidth(length * CIRCLE_RING_RATIO);
                 ((Circle) child).setRadius(length / 2 - ((Circle) child).getStrokeWidth() / 2);
             } else if (child instanceof Line) {
@@ -959,9 +980,9 @@ public class Main extends Application {
                 int endSquare = getSquare(previousWidth, previousHeight,
                         (int) ((Arrow) child).getEndX(), (int) ((Arrow) child).getEndY());
                 ((Arrow) child).setStartX(getX(width, height, startSquare) + length / 2);
-                ((Arrow) child).setStartY(getY(height, startSquare) + length / 2);
+                ((Arrow) child).setStartY(getY(width, height, startSquare) + length / 2);
                 ((Arrow) child).setEndX(getX(width, height, endSquare) + length / 2);
-                ((Arrow) child).setEndY(getY(height, endSquare) + length / 2);
+                ((Arrow) child).setEndY(getY(width, height, endSquare) + length / 2);
                 ((Arrow) child).setStrokeWidth(length * ARROW_STROKE_RATIO);
                 ((Arrow) child).setArrowHeadSize(length * ARROW_HEAD_RATIO);
             }
@@ -980,7 +1001,7 @@ public class Main extends Application {
 
     private void displayTile(int i) {
         int mouseSquare = getSquare(scene, (int) mousePose[0], (int) mousePose[1]);
-        double squareWidth = scene.getHeight() / 8;
+        double squareWidth = min(scene.getWidth(), scene.getHeight()) / 8;
         int pieceType = gameState.getBoard()[i];
         Rectangle sq = squares[i];
         circles[i].setVisible(false);
@@ -1009,7 +1030,7 @@ public class Main extends Application {
 
     private void displayPiece(int i) {
         int pieceType = gameState.getBoard()[i];
-        double squareWidth = scene.getHeight() / 8;
+        double squareWidth = min(scene.getWidth(), scene.getHeight()) / 8;
         ImageView piece = pieces[i];
         if (pieceType == 0) {
             piece.setVisible(false);
@@ -1026,7 +1047,7 @@ public class Main extends Application {
     }
 
     public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
-        double squareWidth = scene.getHeight() / 8;
+        double squareWidth = min(scene.getWidth(), scene.getHeight()) / 8;
         Arrow arrow = new Arrow(getX(scene, square1) + squareWidth / 2,
                 getY(scene, square1) + squareWidth / 2, getX(scene, square2) + squareWidth / 2,
                 getY(scene, square2) + squareWidth / 2, squareWidth * ARROW_HEAD_LINE_RATIO);
@@ -1061,7 +1082,7 @@ public class Main extends Application {
     }
 
     public static void drawRing(Scene scene, Group pencilMarkings, int square) {
-        double squareWidth = scene.getHeight() / 8;
+        double squareWidth = min(scene.getWidth(), scene.getHeight()) / 8;
         Circle circle = new Circle(getX(scene, square) + squareWidth / 2,
                 getY(scene, square) + squareWidth / 2,
                 squareWidth / 2 - squareWidth * CIRCLE_RING_RATIO / 2);
@@ -1106,9 +1127,11 @@ public class Main extends Application {
     }
 
     public static int getSquare(double width, double height, int x, int y) {
-        int length = (int) height / 8;
-        int row = floorDiv(y, length);
-        int col = floorDiv(x - (int) (width - height) / 2, length);
+        int length = (int) min(width, height) / 8;
+        int row = width > height ? floorDiv(y, length) :
+                floorDiv(y - (int) (height - width) / 2, length);
+        int col = width > height ? floorDiv(x - (int) (width - height) / 2, length) :
+                floorDiv(x, length);
         if (row < 0 || row > 7 || col < 0 || col > 7) return -1;
         return row * 8 + col;
     }
@@ -1126,14 +1149,16 @@ public class Main extends Application {
     }
 
     public static double getY(Scene scene, int idx) {
-        return getY(scene.getHeight(), idx);
+        return getY(scene.getWidth(), scene.getHeight(), idx);
     }
 
     public static double getX(double width, double height, int idx) {
-        return (width - height) / 2 + (idx % 8) * height / 8;
+        return width > height ? (width - height) / 2 + (idx % 8) * height / 8 :
+                idx % 8 * width / 8;
     }
 
-    public static double getY(double height, int idx) {
-        return floorDiv(idx, 8) * height / 8;
+    public static double getY(double width, double height, int idx) {
+        return width > height ? floorDiv(idx, 8) * height / 8 :
+                (height - width) / 2 + floorDiv(idx, 8) * width / 8;
     }
 }

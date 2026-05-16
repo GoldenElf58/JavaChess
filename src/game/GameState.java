@@ -1,3 +1,7 @@
+package game;
+
+import eval.PieceSquareTables;
+
 import static java.lang.Math.abs;
 
 public class GameState {
@@ -40,7 +44,7 @@ public class GameState {
     private final ZobristHash zobrist;
     private static final byte[] bishopDirs = {9, -9, 7, -7};
 
-    GameState() {
+    public GameState() {
         zobrist = new ZobristHash();
         board = startBoard;
         whiteQueen = true;
@@ -64,7 +68,7 @@ public class GameState {
         blackKingSquare = 4;
     }
 
-    GameState(byte[] board) {
+    public GameState(byte[] board) {
         this.board = board;
         whiteQueen = true;
         whiteKing = true;
@@ -918,12 +922,24 @@ public class GameState {
 
     public MutableGameState asMutable() {
         int score = 0;
-        for (byte i = 0; i < 64; i++) score += PieceSquareTables.getPieceSquareValue(board[i], i);
+        byte blackRooks = 0;
+        byte whiteRooks = 0;
+        byte blackQueens = 0;
+        byte whiteQueens = 0;
+        byte piece;
+        for (byte i = 0; i < 64; i++) {
+            piece = board[i];
+            score += PieceSquareTables.getPieceSquareValue(piece, i);
+            if (piece == -4) blackRooks++;
+            else if (piece == -5) blackQueens++;
+            else if (piece == 4) whiteRooks++;
+            else if (piece == 5) whiteQueens++;
+        }
         return new MutableGameState(board.clone(), whiteQueen, whiteKing, blackQueen, blackKing,
                 lastMove == null ? -1 : lastMove[1], halfMoves, halfMoveClock, whiteMove,
                 positionHistory, isWinner, winner, blackKnights, whiteKnights, blackBishops,
-                whiteBishops, otherPieces, whiteKingSquare, blackKingSquare, zobrist,
-                lastMove != null, getHash(), score);
+                whiteBishops, blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
+                whiteKingSquare, blackKingSquare, zobrist, lastMove != null, getHash(), score);
     }
 
     public String moveToString(int moveIdx) {

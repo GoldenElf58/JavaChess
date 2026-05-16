@@ -1,3 +1,9 @@
+package eval;
+
+import game.GameState;
+import game.MutableGameState;
+import utils.Watch;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -5,7 +11,7 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class TestBot implements Bot {
+public class BotVTest implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -13,7 +19,6 @@ public class TestBot implements Bot {
     private boolean print;
     private final TTEntry emptyTT = new TTEntry();
     private MutableGameState[][] pools = new MutableGameState[10][218];
-    private final MutableGameState[] capturePools = new MutableGameState[10];
     private volatile boolean stopSearch = false;
     private int lastDepth;
 
@@ -28,7 +33,7 @@ public class TestBot implements Bot {
         }
     }
 
-    public TestBot(boolean log, boolean print) {
+    public BotVTest(boolean log, boolean print) {
         this.log = log;
         this.print = print;
     }
@@ -59,7 +64,7 @@ public class TestBot implements Bot {
         clearCache();
         stopSearch = false;
         final int[] depth = {1};
-        final int[] move = {0};
+        final int[] move = {-1};
         Thread thread = new Thread(() -> {
         });
         score = 0;
@@ -70,7 +75,8 @@ public class TestBot implements Bot {
                 thread = new Thread(() -> {
                     try {
                         pools = new MutableGameState[10][218];
-                        move[0] = minimaxMove(state.asMutable(), depth[0], state.isWhiteMove());
+                        move[0] = minimaxMove(state.asMutable(), depth[0], state.isWhiteMove(),
+                                move[0]);
                         depth[0]++;
                     } catch (StopSearchException _) {
                     }
@@ -107,7 +113,7 @@ public class TestBot implements Bot {
         }
         clearCache();
         lastDepth = depth[0];
-        return move[0];
+        return move[0] == -1 ? 0 : move[0];
     }
 
     public int iterativeDeepening(GameState state, int maxDepth) {
@@ -116,11 +122,11 @@ public class TestBot implements Bot {
         stopSearch = false;
         clearCache();
         int depth = 1;
-        int move = 0;
+        int move = -1;
         score = 0;
         while (depth <= maxDepth) {
             if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
-            move = minimaxMove(state.asMutable(), depth, state.isWhiteMove());
+            move = minimaxMove(state.asMutable(), depth, state.isWhiteMove(), move);
             depth++;
         }
         if (log) {
@@ -145,15 +151,15 @@ public class TestBot implements Bot {
         }
         clearCache();
         lastDepth = depth;
-        return move;
+        return move == -1 ? 0 : move;
     }
 
-    private int minimaxMove(MutableGameState state, int depth, boolean isMaximizing) {
+    private int minimaxMove(MutableGameState state, int depth, boolean isMaximizing,
+                            int bestMoveIdx) {
         assert depth > 0;
         state.computeMoves();
         if (!state.isInProgress()) return -1;
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
-        int bestMoveIdx = 0;
         int alpha = Integer.MIN_VALUE / 2;
         int beta = Integer.MAX_VALUE / 2;
 
@@ -168,7 +174,9 @@ public class TestBot implements Bot {
                 nextStates[i] = state.makeMove(i);
                 state.undoMove();
             }
-            Arrays.sort(moveSearchOrder, (m1, m2) -> (isMaximizing ? -1 : 1) *
+            int finalBestMoveIdx = bestMoveIdx;
+            Arrays.sort(moveSearchOrder, (m1, m2) -> m1 == finalBestMoveIdx ? -1 :
+             m2 == finalBestMoveIdx ? 1 : (isMaximizing ? -1 : 1) *
                     (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
                             - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
         } else {
@@ -184,6 +192,10 @@ public class TestBot implements Bot {
             nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
+            if (stopSearch) {
+                this.score = bestScore;
+                return bestMoveIdx;
+            }
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
                 bestMoveIdx = sortMoves ? moveSearchOrder[i] : i;
@@ -197,12 +209,8 @@ public class TestBot implements Bot {
 
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
-        if (stopSearch) throw new StopSearchException();
-        if (depth >= maxDepth) {
-            if (state.getMoveCount() != 0)
-                return minimaxCapturesOnly(state, 1, isMaximizing, alpha, beta);
-            return evaluate(state);
-        }
+        if (stopSearch) return 0;
+        if (depth == maxDepth) return evaluate(state);
         long hashKey = state.getHash();
         TTEntry thisEntry;
         if (moveCache.containsKey(hashKey)) {
@@ -252,11 +260,12 @@ public class TestBot implements Bot {
                 state.makeMoveOnlyBoard(moveSearchOrder[i]);
                 nextState = nextStates[moveSearchOrder[i]];
             } else {
-                if (pools[depth][i] != null) nextState = state.loadMoveTo(pools[depth][i], i);
-                else pools[depth][i] = nextState = state.makeMove(i);
+                if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], i);
+                else pools[depth][0] = nextState = state.makeMove(i);
             }
             score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
+            if (stopSearch) return 0;
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
                 if (isMaximizing) alpha = score;
@@ -270,43 +279,6 @@ public class TestBot implements Bot {
         thisEntry.score = bestScore;
         thisEntry.depthRemaining = maxDepth - depth;
         moveCache.put(hashKey, thisEntry);
-        return bestScore;
-    }
-
-    private int minimaxCapturesOnly(MutableGameState state, int depth, boolean isMaximizing,
-                                    int alpha, int beta) {
-        if (stopSearch) throw new StopSearchException();
-        if (depth >= 6) return evaluate(state);
-        int standPat = evaluate(state);
-        if (isMaximizing) {
-            if (standPat >= beta) return standPat;
-            alpha = Math.max(alpha, standPat);
-        } else {
-            if (standPat <= alpha) return standPat;
-            beta = Math.min(beta, standPat);
-        }
-        state.computeMovesOnlyCaptures();
-        if (state.getMoveCount() == 0) return evaluate(state);
-        if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
-
-        int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
-        int score;
-        MutableGameState nextState = capturePools[depth - 1];
-        if (nextState == null) capturePools[depth - 1] = nextState = new GameState().asMutable();
-        for (int i = 0; i < state.getMoveCount(); i++) {
-            nextState = state.loadMoveTo(nextState, i);
-            score = minimaxCapturesOnly(nextState, depth + 1, !isMaximizing, alpha, beta);
-            state.undoMove();
-            if (isMaximizing ? score > bestScore : score < bestScore) {
-                bestScore = score;
-                if (isMaximizing) alpha = score;
-                else beta = score;
-                if (beta <= alpha) break;
-            }
-        }
-        if (isMaximizing ? bestScore >= Integer.MAX_VALUE / 2 - 256 :
-                bestScore <= -Integer.MAX_VALUE / 2 + 256)
-            bestScore -= (isMaximizing ? 1 : -1);
         return bestScore;
     }
 }

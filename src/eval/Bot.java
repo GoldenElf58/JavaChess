@@ -1,3 +1,7 @@
+package eval;
+
+import game.GameState;
+
 public interface Bot {
     void setPrinting(boolean print);
 

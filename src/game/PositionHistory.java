@@ -1,3 +1,5 @@
+package game;
+
 public class PositionHistory {
     public long positionHash;
     public int count;
