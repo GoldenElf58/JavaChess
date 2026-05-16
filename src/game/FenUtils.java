@@ -20,7 +20,7 @@ public class FenUtils {
     }
 
     public static GameState getFenGameState(int i) {
-        File fens = new File("src/start_positions.txt");
+        File fens = new File("src/game/start_positions.txt");
         String fen;
         try (FileReader fr = new FileReader(fens)) {
             fen = fr.readAllLines().get(i);
