@@ -1,5 +1,6 @@
 import app.Arrow;
 import app.Colors;
+import app.Div;
 import app.SoundHandler;
 import eval.BotV3UsePartialSearch;
 import utils.Watch;
@@ -86,8 +87,9 @@ public class Main extends Application {
     private ImageView[] pieces;
     private final Rectangle[] borders = new Rectangle[2];
 
-    private Button btnWhitePlayer, btnBlackPlayer, btnDeepTest;
+    private Button btnDeepTest;
     private TextField tfAllottedTime;
+    private Div div;
     private Text infoText;
 
     private final double[] mousePose = {-1, -1};
@@ -129,8 +131,8 @@ public class Main extends Application {
     private static final boolean useBot1Move = true;
     private static final boolean useTestBotMove = false;
 
-    private final BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(true, true);
-    private final BotVTest testBot = new BotVTest(true, true);
+    private final BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(false, true);
+    private final BotVTest testBot = new BotVTest(false, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
@@ -232,8 +234,8 @@ public class Main extends Application {
         watch.stop();
         IO.println("\n");
         System.out.printf("Max depth: %d%n", maxDepth);
-        System.out.printf("Use Curr eval.Bot: %b%n", useCurrBot);
-        System.out.printf("Use Test eval.Bot: %b%n", useTestBot);
+        System.out.printf("Use Curr Bot: %b%n", useCurrBot);
+        System.out.printf("Use Test Bot: %b%n", useTestBot);
         System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
         System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
@@ -283,7 +285,7 @@ public class Main extends Application {
 
         Group root = new Group();
         pencilMarkings = new Group();
-        scene = new Scene(root, 853, 480, Color.grayRgb(0));
+        scene = new Scene(root, 1080, 720, Color.grayRgb(0));
         pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT,
                 Color.TRANSPARENT);
         SoundHandler.loadSounds();
@@ -298,10 +300,12 @@ public class Main extends Application {
 
         initializeNodes(root);
 
-        root.getChildren().add(tfAllottedTime = getAllottedTimeTF());
-        root.getChildren().add(btnBlackPlayer = getWhitePlayerButton());
-        root.getChildren().add(btnWhitePlayer = getBlackPlayerButton());
-        root.getChildren().add(btnDeepTest = getDeepTestButton());
+        div = new Div(4);
+        div.add(tfAllottedTime = getAllottedTimeTF());
+        div.add(getWhitePlayerButton());
+        div.add(getBlackPlayerButton());
+        div.add(btnDeepTest = getDeepTestButton());
+        root.getChildren().addAll(div.getElements());
         root.getChildren().add(infoText = getInfoText());
 
         stage.setScene(scene);
@@ -352,7 +356,7 @@ public class Main extends Application {
     }
 
     private @NotNull Button getBlackPlayerButton() {
-        Button blackPlayer = new Button(blackPlayerHuman ? "Black Human" : "Black eval.Bot");
+        Button blackPlayer = new Button(blackPlayerHuman ? "Black Human" : "Black Bot");
         blackPlayer.setTranslateX(10);
         blackPlayer.setTranslateY(200);
         blackPlayer.setPrefHeight(30);
@@ -370,14 +374,14 @@ public class Main extends Application {
             blackPlayer.setStyle(btnHoverStyle);
             if (!deepTest) blackPlayerHuman = !blackPlayerHuman;
             if (!blackPlayerHuman && gameState.getColor() == -1) makeBotMoveAsync();
-            blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black eval.Bot");
+            blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black Bot");
         });
         blackPlayer.setOnMousePressed(_ -> blackPlayer.setStyle(btnClickStyle));
         return blackPlayer;
     }
 
     private @NotNull Button getWhitePlayerButton() {
-        Button whitePlayer = new Button(whitePlayerHuman ? "White Human" : "White eval.Bot");
+        Button whitePlayer = new Button(whitePlayerHuman ? "White Human" : "White Bot");
         whitePlayer.setTranslateX(10);
         whitePlayer.setTranslateY(250);
         whitePlayer.setPrefHeight(30);
@@ -395,7 +399,7 @@ public class Main extends Application {
             whitePlayer.setStyle(btnHoverStyle);
             if (!deepTest) whitePlayerHuman = !whitePlayerHuman;
             if (!whitePlayerHuman && gameState.getColor() == 1) makeBotMoveAsync();
-            whitePlayer.setText(whitePlayerHuman ? "White Human" : "White eval.Bot");
+            whitePlayer.setText(whitePlayerHuman ? "White Human" : "White Bot");
         });
         whitePlayer.setOnMousePressed(_ -> whitePlayer.setStyle(btnClickStyle));
         return whitePlayer;
@@ -478,7 +482,7 @@ public class Main extends Application {
     public void loop() {
         displayBoard();
 
-        if (!gameState.isInProgress() && !shown) {
+        if (!gameState.isInProgress() && !shown && !deepTest) {
             SoundHandler.playSound("game-end");
             IO.println(gameState);
             IO.println((switch (gameState.getWinner()) {
@@ -848,6 +852,8 @@ public class Main extends Application {
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
+                currBot.clearCache();
+                testBot.clearCache();
                 gameState = FenUtils.getFenGameState(testIdx / 2);
                 gameState.computeMoves();
                 makeBotMoveAsync();
@@ -898,27 +904,10 @@ public class Main extends Application {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = Math.min(width, height) / 8;
-        if ((width - height) / 2 < 120) {
-            tfAllottedTime.setVisible(false);
-            btnWhitePlayer.setVisible(false);
-            btnBlackPlayer.setVisible(false);
-            btnDeepTest.setVisible(false);
+        div.positionElements(scene);
+        if ((width - height) / 2 < 120)
             infoText.setVisible(false);
-        } else {
-            tfAllottedTime.setVisible(true);
-            btnWhitePlayer.setVisible(true);
-            btnBlackPlayer.setVisible(true);
-            btnDeepTest.setVisible(true);
-            infoText.setVisible(true);
-            double x = (width - height) / 2 - 110;
-            tfAllottedTime.setTranslateX(x);
-            btnWhitePlayer.setTranslateX(x);
-            btnBlackPlayer.setTranslateX(x);
-            btnDeepTest.setTranslateX(x);
-            tfAllottedTime.setTranslateY(height / 2 - 90);
-            btnWhitePlayer.setTranslateY(height / 2 - 40);
-            btnBlackPlayer.setTranslateY(height / 2 + 10);
-            btnDeepTest.setTranslateY(height / 2 + 60);
+        else {
             infoText.setTranslateX((width - height) / 2 + height + 10);
             infoText.setWrappingWidth(clamp((width - height) / 2 - 20, 100,
                     clamp(120 * height / 480, 120, 220)));
