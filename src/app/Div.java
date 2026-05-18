@@ -27,11 +27,12 @@ public class Div {
     public void positionElements(Scene scene) {
         double width = scene.getWidth();
         double height = scene.getHeight();
-        double eleSize = clamp(min(((width - height) / 2 - 20) / 100, height / 480), 1, 1.5);
-        if ((width - height) / 2 < 120) {
-            for (Control ele : elements) ele.setVisible(false);
-        } else {
-            double x = (width - height) / 2 - 10 - 100 * eleSize;
+        if ((width - height) / 2 < 120) for (Control ele : elements) ele.setVisible(false);
+        else {
+            double eleSize = clamp(min(((width - height) / 2 - 20) / 100, height / 480), 1, 1.5);
+            for (int i = 0; i < 3; i++)
+                eleSize = clamp(min(((width - height) / 2 - 20 * eleSize) / 100, height / 480), 1, 1.5);
+            double x = (width - height) / 2 - 110 * eleSize;
             double y = height / 2 + 10 - (elements.length) * 25 * eleSize;
             for (Control ele : elements) {
                 ele.setVisible(true);

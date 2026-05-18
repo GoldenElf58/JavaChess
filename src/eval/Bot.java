@@ -12,4 +12,6 @@ public interface Bot {
     int iterativeDeepening(GameState state, int maxDepth);
 
     int getLastDepth();
+
+    int getLastEval();
 }

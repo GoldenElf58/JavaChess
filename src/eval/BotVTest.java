@@ -27,6 +27,10 @@ public class BotVTest implements Bot {
         int depthRemaining;
     }
 
+    public int getLastEval() {
+        return score;
+    }
+
     private static class StopSearchException extends RuntimeException {
         public StopSearchException() {
             super("StopSearchException");
@@ -46,8 +50,8 @@ public class BotVTest implements Bot {
         moveCache.clear();
     }
 
-    private int evaluate(MutableGameState state) {
-        return state.getEvaluation();
+    private int evaluate(MutableGameState state, boolean partial) {
+        return partial ? state.getCurEval() : state.getEvaluation();
     }
 
     public int getMove(GameState state, double allottedTime) {
@@ -176,9 +180,10 @@ public class BotVTest implements Bot {
             }
             int finalBestMoveIdx = bestMoveIdx;
             Arrays.sort(moveSearchOrder, (m1, m2) -> m1 == finalBestMoveIdx ? -1 :
-             m2 == finalBestMoveIdx ? 1 : (isMaximizing ? -1 : 1) *
+                    m2 == finalBestMoveIdx ? 1 :
+                    (isMaximizing ? -1 : 1) *
                     (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
-                            - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
+                     - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
         } else {
             nextStates = null;
             moveSearchOrder = null;
@@ -210,7 +215,7 @@ public class BotVTest implements Bot {
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
         if (stopSearch) return 0;
-        if (depth == maxDepth) return evaluate(state);
+        if (depth == maxDepth) return evaluate(state, false);
         long hashKey = state.getHash();
         TTEntry thisEntry;
         if (moveCache.containsKey(hashKey)) {
@@ -220,6 +225,13 @@ public class BotVTest implements Bot {
         } else thisEntry = new TTEntry();
         state.computeMoves();
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
+        if (maxDepth - depth >= 4 && depth >= 3 && state.hasNonPawnMaterial() && !state.inCheck()) {
+            int score = -minimaxScore(state.makeNullMove(), depth + 1, maxDepth - 3, !isMaximizing,
+                    isMaximizing ? beta - 1 : alpha, isMaximizing ? beta : alpha + 1);
+            state.undoNullMove();
+            if (isMaximizing && score >= beta) return beta;
+            if (!isMaximizing && score <= alpha) return alpha;
+        }
 
         final Integer[] moveSearchOrder;
         final MutableGameState[] nextStates;
@@ -254,16 +266,17 @@ public class BotVTest implements Bot {
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
-        MutableGameState nextState;
+        MutableGameState nextState = null;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) {
                 state.makeMoveOnlyBoard(moveSearchOrder[i]);
                 nextState = nextStates[moveSearchOrder[i]];
-            } else {
+            } else if (depth + 1 != maxDepth) {
                 if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], i);
                 else pools[depth][0] = nextState = state.makeMove(i);
-            }
-            score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
+            } else state.makeMoveOnlyBoardEval(i);
+            if (depth + 1 == maxDepth) score = evaluate(state, true);
+            else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (stopSearch) return 0;
             if (isMaximizing ? score > bestScore : score < bestScore) {

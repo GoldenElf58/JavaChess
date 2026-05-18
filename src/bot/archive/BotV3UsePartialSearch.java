@@ -1,5 +1,6 @@
-package eval;
+package bot.archive;
 
+import eval.Bot;
 import game.GameState;
 import game.MutableGameState;
 import utils.Watch;
@@ -25,6 +26,10 @@ public class BotV3UsePartialSearch implements Bot {
     private static class TTEntry {
         int score;
         int depthRemaining;
+    }
+
+    public int getLastEval() {
+        return score;
     }
 
     private static class StopSearchException extends RuntimeException {

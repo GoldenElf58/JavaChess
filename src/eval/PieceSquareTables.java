@@ -29,11 +29,11 @@ public class PieceSquareTables {
         if (piece == 0) return 0;
         int[] pieceTable = switch (piece) {
             case -1, 1 -> PawnsEnd;
+            case -6, 6 -> KingEnd;
             case -2, 2 -> Knights;
             case -3, 3 -> Bishops;
             case -4, 4 -> Rooks;
             case -5, 5 -> Queens;
-            case -6, 6 -> KingEnd;
             default -> throw new IllegalArgumentException("Invalid piece: " + piece);
         };
         return piece > 0 ? pieceTable[square] : -pieceTable[63 - square];
@@ -60,6 +60,21 @@ public class PieceSquareTables {
             if (abs(piece) == 1 || abs(piece) == 6) {
                 eval -= getPieceSquareValue(piece, i);
                 eval += getPieceSquareValueEndgame(piece, i);
+            }
+        }
+        return eval;
+    }
+
+    public static int convertToEndgame(byte[] board, int curEval, float whiteEndgameWeight,
+                                       float blackEndgameWeight) {
+        byte piece;
+        int eval = curEval;
+        for (int i = 0; i < 64; i++) {
+            piece = board[i];
+            if (abs(piece) == 1 || abs(piece) == 6) {
+                eval += (int) ((getPieceSquareValueEndgame(piece, i) -
+                        getPieceSquareValue(piece, i)) * ((piece > 0) ?
+                        whiteEndgameWeight : blackEndgameWeight));
             }
         }
         return eval;

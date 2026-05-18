@@ -2,13 +2,14 @@ import app.Arrow;
 import app.Colors;
 import app.Div;
 import app.SoundHandler;
-import eval.BotV3UsePartialSearch;
-import utils.Watch;
-import eval.BotVTest;
+import eval.Bot;
+import bot.archive.BotV3UsePartialSearch;
+import eval.BotV4UsePartialState;
 import game.FenUtils;
 import game.GameState;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
@@ -32,6 +33,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
+import utils.Watch;
 
 import java.io.File;
 import java.util.*;
@@ -41,8 +43,8 @@ import static utils.Watch.time;
 
 public class Main extends Application {
 
-    private static final double DEFAULT_SCENE_WIDTH = 720;
-    private static final double DEFAULT_SCENE_HEIGHT = 480;
+    private static final double DEFAULT_SCENE_WIDTH = 1080;
+    private static final double DEFAULT_SCENE_HEIGHT = 720;
     private static final double MIN_SCENE_WIDTH = 292;
     private static final double MIN_SCENE_HEIGHT = 292;
 
@@ -59,13 +61,13 @@ public class Main extends Application {
     static final double LINE_WIDTH_RATIO = 0.15;
     static final double CIRCLE_RING_RATIO = 0.0833333333;
 
-    static final String btnStyle = "-fx-background-color: #333333; -fx-text-fill: white; " +
+    static final String btnStyle = "-fx-background-color: #303030; -fx-text-fill: #eeeeee; " +
             "-fx-border-color: transparent;";
-    static final String btnHoverStyle = "-fx-background-color: #555555; -fx-text-fill: white; " +
+    static final String btnHoverStyle = "-fx-background-color: #505050; -fx-text-fill: #eeeeee; " +
             "-fx-border-color: transparent;";
-    static final String btnClickStyle = "-fx-background-color: #777777; -fx-text-fill: white; " +
+    static final String btnClickStyle = "-fx-background-color: #707070; -fx-text-fill: #eeeeee; " +
             "-fx-border-color: transparent;";
-    static final String tfStyle = "-fx-background-color: #333333; -fx-text-fill: white; " +
+    static final String tfStyle = "-fx-background-color: #303030; -fx-text-fill: #eeeeee; " +
             "-fx-border-color: transparent;";
 
     private final Map<Integer, Image> imageCache = new HashMap<>();
@@ -73,6 +75,7 @@ public class Main extends Application {
     private static double previousHeight = DEFAULT_SCENE_HEIGHT;
 
     private Scene scene;
+    private Stage stage;
     private Group pencilMarkings;
     private Scene pencilScene;
     private GameState gameState;
@@ -81,6 +84,7 @@ public class Main extends Application {
     private List<byte[]> moveHistory;
     private List<byte[]> moveFuture;
     private WritableImage pencilImage;
+    private Rectangle darkRect;
 
     private Rectangle[] squares;
     private Circle[] circles;
@@ -108,6 +112,7 @@ public class Main extends Application {
     private int totalTestDepth = 0;
     private int totalCurrMoves = 0;
     private int totalTestMoves = 0;
+    private boolean darkMode = false;
 
     // ==============================
     // Parameters
@@ -131,8 +136,8 @@ public class Main extends Application {
     private static final boolean useBot1Move = true;
     private static final boolean useTestBotMove = false;
 
-    private final BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(false, true);
-    private final BotVTest testBot = new BotVTest(false, true);
+    private final Bot currBot = new BotV4UsePartialState(false, true);
+    private final Bot testBot = new BotV4UsePartialState(false, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
@@ -150,7 +155,7 @@ public class Main extends Application {
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
         BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(false, false);
-        BotVTest testBot = new BotVTest(false, false);
+        BotV4UsePartialState testBot = new BotV4UsePartialState(false, false);
         Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
@@ -194,12 +199,16 @@ public class Main extends Application {
                 movesThisGame++;
                 int move = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
-                if (useCurrBot)
+                if (useCurrBot) {
                     move = useBot1Move ? currBot.iterativeDeepening(gameState, maxDepth) : move;
+                    if (!useCurrBot) currBot.iterativeDeepening(gameState, maxDepth);
+                }
                 oldWatch.stop();
                 newWatch.start();
-                if (useTestBot)
+                if (useTestBot) {
                     move = useTestBotMove ? testBot.iterativeDeepening(gameState, maxDepth) : move;
+                    if (!useTestBot) testBot.iterativeDeepening(gameState, maxDepth);
+                }
                 newWatch.stop();
                 gameState = gameState.makeMove(move);
                 gameState.computeMoves();
@@ -279,15 +288,17 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
+        this.stage = stage;
         stage.setTitle("Chess");
         stage.setMinWidth(MIN_SCENE_WIDTH);
         stage.setMinHeight(MIN_SCENE_HEIGHT);
+        double height = DEFAULT_SCENE_HEIGHT;
+        double width = DEFAULT_SCENE_WIDTH;
 
         Group root = new Group();
         pencilMarkings = new Group();
-        scene = new Scene(root, 1080, 720, Color.grayRgb(0));
-        pencilScene = new Scene(pencilMarkings, DEFAULT_SCENE_WIDTH, DEFAULT_SCENE_HEIGHT,
-                Color.TRANSPARENT);
+        scene = new Scene(root, width, height, Color.grayRgb(0));
+        pencilScene = new Scene(pencilMarkings, width, height, Color.TRANSPARENT);
         SoundHandler.loadSounds();
 
         pencilImage = new WritableImage(3840, 2160);
@@ -300,11 +311,18 @@ public class Main extends Application {
 
         initializeNodes(root);
 
-        div = new Div(4);
+        darkRect = new Rectangle((width - height) / 2, 0, (width - height) * 2,
+                (width - height) * 2);
+        darkRect.setOpacity(0);
+        root.getChildren().add(darkRect);
+
+        div = new Div(5);
         div.add(tfAllottedTime = getAllottedTimeTF());
         div.add(getWhitePlayerButton());
         div.add(getBlackPlayerButton());
         div.add(btnDeepTest = getDeepTestButton());
+        div.add(getDarkModeButton());
+        div.positionElements(scene);
         root.getChildren().addAll(div.getElements());
         root.getChildren().add(infoText = getInfoText());
 
@@ -338,10 +356,6 @@ public class Main extends Application {
 
     private @NotNull TextField getAllottedTimeTF() {
         TextField allottedTimeTF = new TextField();
-        allottedTimeTF.setTranslateX(10);
-        allottedTimeTF.setTranslateY(150);
-        allottedTimeTF.setPrefHeight(30);
-        allottedTimeTF.setPrefWidth(100);
         allottedTimeTF.setStyle(tfStyle);
         allottedTimeTF.setText(String.valueOf(allottedTime));
         allottedTimeTF.deselect();
@@ -357,10 +371,6 @@ public class Main extends Application {
 
     private @NotNull Button getBlackPlayerButton() {
         Button blackPlayer = new Button(blackPlayerHuman ? "Black Human" : "Black Bot");
-        blackPlayer.setTranslateX(10);
-        blackPlayer.setTranslateY(200);
-        blackPlayer.setPrefHeight(30);
-        blackPlayer.setPrefWidth(100);
         blackPlayer.setStyle(btnStyle);
         blackPlayer.setOnMouseEntered(_ -> {
             blackPlayer.setStyle(btnHoverStyle);
@@ -382,10 +392,6 @@ public class Main extends Application {
 
     private @NotNull Button getWhitePlayerButton() {
         Button whitePlayer = new Button(whitePlayerHuman ? "White Human" : "White Bot");
-        whitePlayer.setTranslateX(10);
-        whitePlayer.setTranslateY(250);
-        whitePlayer.setPrefHeight(30);
-        whitePlayer.setPrefWidth(100);
         whitePlayer.setStyle(btnStyle);
         whitePlayer.setOnMouseEntered(_ -> {
             whitePlayer.setStyle(btnHoverStyle);
@@ -407,10 +413,6 @@ public class Main extends Application {
 
     private @NotNull Button getDeepTestButton() {
         Button deepTest = new Button(Main.deepTest ? "Stop" : "Deep Test");
-        deepTest.setTranslateX(10);
-        deepTest.setTranslateY(300);
-        deepTest.setPrefHeight(30);
-        deepTest.setPrefWidth(100);
         deepTest.setStyle(btnStyle);
         deepTest.setOnMouseEntered(_ -> {
             deepTest.setStyle(btnHoverStyle);
@@ -440,7 +442,7 @@ public class Main extends Application {
                 gameStateFuture.clear();
                 gameStateHistory.clear();
                 moveHistory.clear();
-                infoText.setText("White Wins: 0\nBlack Wins: 0\nDraws: 0\nP-Value: 1.0000");
+                updateInfoText();
                 gameState = FenUtils.getFenGameState(testIdx);
                 gameState.computeMoves();
                 makeBotMoveAsync();
@@ -450,28 +452,65 @@ public class Main extends Application {
         return deepTest;
     }
 
+    private @NotNull Button getDarkModeButton() {
+        Button btnDarkMode = new Button(darkMode ? "Light Mode" : "Dark Mode");
+        btnDarkMode.setStyle(btnStyle);
+        btnDarkMode.setOnMouseEntered(_ -> {
+            btnDarkMode.setStyle(btnHoverStyle);
+            scene.setCursor(Cursor.HAND);
+        });
+        btnDarkMode.setOnMouseExited(_ -> {
+            btnDarkMode.setStyle(btnStyle);
+            scene.setCursor(Cursor.DEFAULT);
+        });
+        btnDarkMode.setOnAction(_ -> {
+            btnDarkMode.setStyle(btnHoverStyle);
+            darkMode = !darkMode;
+            darkRect.setOpacity(darkMode ? 0.3 : 0);
+            darkRect.toFront();
+            btnDarkMode.setText(darkMode ? "Light Mode" : "Dark Mode");
+        });
+        btnDarkMode.setOnMousePressed(_ -> btnDarkMode.setStyle(btnClickStyle));
+        return btnDarkMode;
+    }
+
     private @NotNull Text getInfoText() {
-        Text infoText = new Text();
+        infoText = new Text();
         infoText.setTranslateX(610);
         infoText.setTranslateY(25);
         infoText.setWrappingWidth(100);
-        infoText.setFill(Color.WHITE);
+        infoText.setFill(Color.gray(.95));
         infoText.setFont(new Font(14));
+        deepTest = true;
+        updateInfoText();
+        deepTest = false;
         return infoText;
     }
 
     private void updateInfoText() {
-        if (!deepTest) return;
+        if (!deepTest) {
+            int eval = currBot.getLastEval();
+            int depth = currBot.getLastDepth();
+            infoText.setText(String.format("""
+                            Depth: %d
+                            Eval: %s
+                            """, depth,
+                    eval >= Integer.MAX_VALUE / 2 - depth * 2 ?
+                            "M" + (Integer.MAX_VALUE / 2 - eval) :
+                            eval <= Integer.MIN_VALUE / 2 + depth * 2 ?
+                            "M" + (eval - 1 - Integer.MIN_VALUE / 2) : eval / 100f));
+            return;
+        }
         infoText.setText(String.format("""
-                            Curr Wins: %s
-                            Test Wins: %s
-                            Draws: %s
-                            P-Value: %.4f
-                            
-                            Curr Depth: %.2f
-                            Test Depth: %.2f
-                            Curr Color: %s
-                            Test Color: %s""",
+                        Curr Wins: %s
+                        Test Wins: %s
+                        Draws: %s
+                        P-Value: %.4f
+                        
+                        Curr Depth: %.2f
+                        Test Depth: %.2f
+                        Curr Color: %s
+                        Test Color: %s""",
                 currWins, testWins, draws, pValue,
                 (double) totalCurrDepth / totalCurrMoves,
                 (double) totalTestDepth / totalTestMoves,
@@ -521,6 +560,7 @@ public class Main extends Application {
             }
             case COMMAND -> command = true;
             case SHIFT -> shift = true;
+            case ESCAPE -> stage.setFullScreen(false);
             default -> {
             }
         }
@@ -836,17 +876,21 @@ public class Main extends Application {
                 pValue = getPValue(currWins, draws, testWins);
                 IO.println("Curr Wins: " + currWins + " Test Wins: " + testWins +
                         " Draws: " + draws + " P-Value: " + String.format("%.4f", pValue) +
-                        " Curr Depth: " + currBot.getLastDepth() +
-                        " Test Depth: " + testBot.getLastDepth());
-                updateInfoText();
-                if (testIdx >= 1000) {
+                        " Curr Depth: " + String.format("%.2f",
+                        (double) totalCurrDepth / totalCurrMoves) +
+                        " Test Depth: " + String.format("%.2f",
+                        (double) totalTestDepth / totalTestMoves));
+                Platform.runLater(this::updateInfoText);
+                if (testIdx >= 1000 || pValue <= .003) {
                     deepTest = false;
                     testIdx = 0;
                     whitePlayerHuman = true;
                     blackPlayerHuman = true;
                     currBot.setPrinting(true);
                     testBot.setPrinting(true);
-                    btnDeepTest.setText("Deep Test");
+                    Platform.runLater(() -> btnDeepTest.setText("Deep Test"));
+                    if (pValue <= .003 && testIdx < 1000)
+                        IO.println("Automatically stopped at p = " + String.format("%.4f", pValue));
                     return;
                 }
                 gameStateFuture.clear();
@@ -871,7 +915,7 @@ public class Main extends Application {
                 totalTestDepth += testBot.getLastDepth();
                 totalTestMoves++;
             }
-            updateInfoText();
+            Platform.runLater(this::updateInfoText);
             gameState.computeMoves();
             if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
                 makeBotMoveAsync();
@@ -904,14 +948,21 @@ public class Main extends Application {
         double width = scene.getWidth();
         double height = scene.getHeight();
         double length = Math.min(width, height) / 8;
+        darkRect.setX(max(0, (width - height) / 2));
+        darkRect.setY(max(0, (height - width) / 2));
+        darkRect.setWidth(length * 8);
+        darkRect.setHeight(length * 8);
         div.positionElements(scene);
         if ((width - height) / 2 < 120)
             infoText.setVisible(false);
         else {
+            boolean wasVisible = infoText.isVisible();
+            infoText.setVisible(true);
+            if (!wasVisible) scene.getRoot().requestFocus();
             infoText.setTranslateX((width - height) / 2 + height + 10);
             infoText.setWrappingWidth(clamp((width - height) / 2 - 20, 100,
                     clamp(120 * height / 480, 120, 220)));
-            infoText.setFont(new Font(clamp(height / 480 * 14, 12, 20)));
+            infoText.setFont(new Font(clamp(height / 480 * 12, 12, 20)));
         }
         if (width < 292 - 28) {
             IO.println(width + " " + height);
@@ -1032,6 +1083,7 @@ public class Main extends Application {
             piece.setX(mousePose[0] - squareWidth / 2);
             piece.setY(mousePose[1] - squareWidth / 2);
             piece.toFront();
+            darkRect.toFront();
         }
     }
 

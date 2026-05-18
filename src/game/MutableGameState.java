@@ -3,6 +3,7 @@ package game;
 import eval.PieceSquareTables;
 
 import static java.lang.Math.abs;
+import static java.lang.Math.clamp;
 
 public class MutableGameState {
 
@@ -42,6 +43,9 @@ public class MutableGameState {
     private boolean canEnPassant;
     private int evaluation;
     private int curEval;
+
+    private MutableGameState() {
+    }
 
     private MutableGameState init(byte[] board, boolean whiteQueen, boolean whiteKing,
                                   boolean blackQueen, boolean blackKing, byte enPassantIdx,
@@ -429,186 +433,7 @@ public class MutableGameState {
     }
 
     public MutableGameState makeMove(byte move_0, byte move_1, byte move_2) {
-        byte[] newBoard = board;
-        boolean whiteQueen = this.whiteQueen;
-        boolean whiteKing = this.whiteKing;
-        boolean blackQueen = this.blackQueen;
-        boolean blackKing = this.blackKing;
-        byte blackKnights = this.blackKnights;
-        byte whiteKnights = this.whiteKnights;
-        byte whiteBishops = this.whiteBishops;
-        byte blackBishops = this.blackBishops;
-        byte otherPieces = this.otherPieces;
-        int score = evaluation;
-
-        // Castle
-        if (move_0 == -1) {
-            newBoard[move_1 + move_2 * 2] = (byte) (6 * color);
-            newBoard[move_1 + move_2] = (byte) (4 * color);
-            newBoard[move_1] = 0;
-            newBoard[move_1 + (move_2 == 1 ? 3 : -4)] = 0;
-            score -= PieceSquareTables.getPieceSquareValue(4 * color,
-                    move_1 + (move_2 == 1 ? 3 : -4));
-            score -= PieceSquareTables.getPieceSquareValue(6 * color, move_1);
-            score += PieceSquareTables.getPieceSquareValue(4 * color, move_1 + move_2);
-            score += PieceSquareTables.getPieceSquareValue(6 * color, move_1 + move_2 * 2);
-            if (whiteMove) {
-                whiteQueen = false;
-                whiteKing = false;
-            } else {
-                blackQueen = false;
-                blackKing = false;
-            }
-            lastMutatingPieceTaken = 0;
-            return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
-                    (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops, blackRooks,
-                    whiteRooks, blackQueens, whiteQueens, otherPieces,
-                    whiteMove ? (byte) (move_1 + move_2 * 2) : whiteKingSquare, !whiteMove ?
-                    (byte) (move_1 + move_2 * 2) : blackKingSquare, zobrist, false, zobrist.hash(
-                    newBoard, whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove), score);
-        }
-
-        // Promotion
-        if (move_0 == -2) {
-            newBoard[move_1 - 8 * color] = move_2;
-            newBoard[move_1] = 0;
-            score -= PieceSquareTables.getPieceSquareValue(color, move_1);
-            score += PieceSquareTables.getPieceSquareValue(move_2, move_1 - 8 * color);
-            otherPieces--;
-            if (move_2 == 2) whiteKnights++;
-            else if (move_2 == 3) whiteBishops++;
-            else if (move_2 == -2) blackKnights++;
-            else if (move_2 == -3) blackBishops++;
-            else otherPieces++;
-            lastMutatingPieceTaken = 0;
-            return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
-                    blackKnights, whiteKnights, blackBishops, whiteBishops,
-                    blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
-                    whiteKingSquare, blackKingSquare, zobrist, false, zobrist.hash(newBoard,
-                    whiteQueen, whiteKing, blackQueen, blackKing, !whiteMove), score);
-        }
-
-        // En Passant
-        if (move_0 == -3) {
-            newBoard[move_1 - color * 8 + move_2] = color;
-            newBoard[move_1 + move_2] = 0;
-            newBoard[move_1] = 0;
-            score -= PieceSquareTables.getPieceSquareValue(color, move_1);
-            score -= PieceSquareTables.getPieceSquareValue(-color, move_1 + move_2);
-            score += PieceSquareTables.getPieceSquareValue(color, move_1 - color * 8 + move_2);
-            lastMutatingPieceTaken = (byte) -color;
-            return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove,
-                    null, false, (byte) 0, blackKnights, whiteKnights, blackBishops,
-                    whiteBishops, blackRooks, whiteRooks, blackQueens, whiteQueens,
-                    (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare,
-                    zobrist, false, zobrist.hash(newBoard, whiteQueen, whiteKing, blackQueen,
-                    blackKing, !whiteMove), score);
-        }
-
-        // Promotion Taking
-        if (move_0 <= -4) {
-            lastMutatingPieceTaken = board[move_2];
-            newBoard[move_2] = (byte) ((-2 - move_0) * color);
-            newBoard[move_1] = 0;
-            score -= PieceSquareTables.getPieceSquareValue(color, move_1);
-            score -= PieceSquareTables.getPieceSquareValue(lastMutatingPieceTaken, move_2);
-            score += PieceSquareTables.getPieceSquareValue((byte) ((-2 - move_0) * color), move_2);
-            otherPieces--;
-            if (board[move_2] == 2) whiteKnights--;
-            else if (board[move_2] == 3) whiteBishops--;
-            else if (board[move_2] == -2) blackKnights--;
-            else if (board[move_2] == -3) blackBishops--;
-            else otherPieces--;
-            if (move_0 == -4) {
-                if (color == 1) whiteKnights++;
-                else blackKnights++;
-            } else if (move_0 == -5) {
-                if (color == 1) whiteBishops++;
-                else blackBishops++;
-            } else otherPieces++;
-            return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
-                    (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops,
-                    blackRooks, whiteRooks, blackQueens, whiteQueens,
-                    (byte) (otherPieces - 1), whiteKingSquare, blackKingSquare, zobrist, false,
-                    zobrist.hash(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                            !whiteMove), score);
-        }
-
-        byte piece = newBoard[move_0];
-        byte captured = newBoard[move_1];
-        lastMutatingPieceTaken = captured;
-        newBoard[move_0] = 0;
-        newBoard[move_1] = piece;
-        if (piece == -6) {
-            blackQueen = false;
-            blackKing = false;
-        } else if (piece == 6) {
-            whiteQueen = false;
-            whiteKing = false;
-        } else if (piece == -4) {
-            if (move_0 == 0) blackQueen = false;
-            else if (move_0 == 7) blackKing = false;
-        } else if (piece == 4) {
-            if (move_0 == 56) whiteQueen = false;
-            else if (move_0 == 63) whiteKing = false;
-        }
-
-        long hash;
-        hash = this.hash;
-        hash ^= zobrist.hash(move_0, piece);
-        hash ^= zobrist.hash(move_1, piece);
-        hash ^= zobrist.hash(this.whiteQueen ^ whiteQueen,
-                this.whiteKing ^ whiteKing,
-                this.blackQueen ^ blackQueen,
-                this.blackKing ^ blackKing, true);
-        score -= PieceSquareTables.getPieceSquareValue(piece, move_0);
-        score += PieceSquareTables.getPieceSquareValue(piece, move_1);
-        if (captured != 0) {
-            hash ^= zobrist.hash(move_1, captured);
-            score -= PieceSquareTables.getPieceSquareValue(captured, move_1);
-            if (captured == -4) {
-                otherPieces--;
-                if (move_1 == 0) blackQueen = false;
-                else if (move_1 == 7) blackKing = false;
-            } else if (captured == 4) {
-                otherPieces--;
-                if (move_1 == 56) whiteQueen = false;
-                else if (move_1 == 63) whiteKing = false;
-            } else if (captured == 2) whiteKnights--;
-            else if (captured == 3) whiteBishops--;
-            else if (captured == -2) blackKnights--;
-            else if (captured == -3) blackBishops--;
-            else otherPieces--;
-        } else if ((piece == 1 || piece == -1) && abs(move_0 - move_1) == 16) {
-            return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                    move_1, halfMoves + 1, (byte) 0, !whiteMove, null, false, (byte) 0,
-                    blackKnights, whiteKnights, blackBishops, whiteBishops, blackRooks, whiteRooks,
-                    blackQueens, whiteQueens, otherPieces,
-                    whiteKingSquare, blackKingSquare, zobrist, true, hash, score);
-        }
-
-        byte halfMoveClock = piece == 1 || captured != 0 ? 0 : (byte) (this.halfMoveClock + 1);
-        if (halfMoveClock > 0) {
-            PositionHistory positionHistory = new PositionHistory(hash, this.positionHistory);
-            return new MutableGameState(newBoard, whiteQueen, whiteKing,
-                    blackQueen, blackKing, (byte) -1, halfMoves + 1, halfMoveClock,
-                    !whiteMove, positionHistory, positionHistory.count >= 3, (byte) 0,
-                    blackKnights, whiteKnights, blackBishops, whiteBishops, blackRooks,
-                    whiteRooks, blackQueens, whiteQueens, otherPieces,
-                    piece == 6 ? move_1 : whiteKingSquare, piece == -6 ? move_1 : blackKingSquare,
-                    zobrist, false, hash, score);
-        }
-
-        return new MutableGameState(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
-                (byte) -1, halfMoves + 1, (byte) 0, !whiteMove, null,
-                false, (byte) 0, blackKnights, whiteKnights, blackBishops,
-                whiteBishops, blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
-                piece == 6 ? move_1 : whiteKingSquare, piece == -6 ? move_1 : blackKingSquare,
-                zobrist, false, hash, score);
+        return loadMoveTo(new MutableGameState(), move_0, move_1, move_2);
     }
 
     public MutableGameState loadMoveTo(MutableGameState child, int moveIdx) {
@@ -673,7 +498,11 @@ public class MutableGameState {
             else if (move_2 == 3) whiteBishops++;
             else if (move_2 == -2) blackKnights++;
             else if (move_2 == -3) blackBishops++;
-            else otherPieces++;
+            else if (move_2 == 4) whiteRooks++;
+            else if (move_2 == -4) blackRooks++;
+            else if (move_2 == 5) whiteQueens++;
+            else if (move_2 == -5) blackQueens++;
+            else throw new IllegalStateException("Pawns cannot promote to piece " + move_2);
             newBoard[move_1] = 0;
             lastMutatingPieceTaken = 0;
             return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
@@ -726,7 +555,14 @@ public class MutableGameState {
             } else if (move_0 == -5) {
                 if (color == 1) whiteBishops++;
                 else blackBishops++;
-            } else otherPieces++;
+            } else if (move_0 == -6) {
+                if (color == 1) whiteRooks++;
+                else blackRooks++;
+            } else if (move_0 == -7) {
+                if (color == 1) whiteQueens++;
+                else blackQueens++;
+            } else throw new IllegalStateException("Unknown piece type for promotion taking. " +
+                    "move_0 = " + move_0);
             return child.init(newBoard, whiteQueen, whiteKing, blackQueen, blackKing,
                     (byte) -1, halfMoves + 1, (byte) (halfMoveClock + 1), !whiteMove, null, false,
                     (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops, blackRooks,
@@ -816,10 +652,27 @@ public class MutableGameState {
         undoMoveOnlyBoard(moves[idx], moves[idx + 1], moves[idx + 2], lastMutatingPieceTaken);
     }
 
+    public MutableGameState makeNullMove() {
+        return new MutableGameState(board, whiteQueen, whiteKing, blackQueen, blackKing,
+                enPassantIdx, halfMoves, halfMoveClock, !whiteMove, positionHistory,
+                isWinner, (byte) 0, blackKnights, whiteKnights, blackBishops, whiteBishops,
+                blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
+                whiteKingSquare, blackKingSquare, zobrist, false, hash, evaluation);
+    }
+
+    public void undoNullMove() {
+    }
+
     public void makeMoveOnlyBoard(int moveIdx) {
         int idx = moveIdx * 3;
         lastMutatingMoveIdx = (byte) moveIdx;
         lastMutatingPieceTaken = makeMoveOnlyBoard(moves[idx], moves[idx + 1], moves[idx + 2]);
+    }
+
+    public void makeMoveOnlyBoardEval(int moveIdx) {
+        int idx = moveIdx * 3;
+        lastMutatingMoveIdx = (byte) moveIdx;
+        lastMutatingPieceTaken = makeMoveOnlyBoardEval(moves[idx], moves[idx + 1], moves[idx + 2]);
     }
 
     public byte makeMoveOnlyBoard(byte move_0, byte move_1, byte move_2) {
@@ -968,7 +821,7 @@ public class MutableGameState {
             winner = inCheck() ? (byte) -color : 0;
             return false;
         }
-        if (otherPieces == 0) {
+        if (otherPieces + whiteQueens + blackQueens + whiteRooks + blackRooks == 0) {
             byte minorPieces = (byte) (whiteKnights + whiteBishops + blackKnights + blackBishops);
             if (minorPieces <= 1) {
                 winner = 0;
@@ -998,12 +851,20 @@ public class MutableGameState {
         return evaluation;
     }
 
+    public int getCurEval() {
+        return curEval;
+    }
+
     public byte[] getBoard() {
         return board;
     }
 
-    public int getCurEval() {
-        return curEval;
+    public byte getWhiteKingSquare() {
+        return whiteKingSquare;
+    }
+
+    public byte getBlackKingSquare() {
+        return blackKingSquare;
     }
 
     private void addMovesForKing(byte i) {
@@ -1164,7 +1025,7 @@ public class MutableGameState {
                     target / 8 == idxDiv8 + direction2 * j)) break;
             byte targetPieceType = (byte) (board[target] * color);
             if (targetPieceType == 0) continue;
-            if (targetPieceType < 1) addMoveSlot(i, target);
+            if (targetPieceType < 0) addMoveSlot(i, target);
             break;
         }
     }
@@ -1201,10 +1062,10 @@ public class MutableGameState {
             for (byte k = -1; k <= 1; k += 2) {
                 target = (byte) (i + j * 8 + k);
                 if (idxMod8 + k == (target & 7) && 0 <= target && target < 64
-                        && board[target] * color < 1) addMoveSlot(i, target);
+                        && board[target] * color < 0) addMoveSlot(i, target);
                 target = (byte) (i + j + k * 8);
                 if (idxMod8 + j == (target & 7) && 0 <= target && target < 64
-                        && board[target] * color < 1) addMoveSlot(i, target);
+                        && board[target] * color < 0) addMoveSlot(i, target);
             }
         }
     }
@@ -1269,6 +1130,18 @@ public class MutableGameState {
     public boolean isPawnEndgame() {
         return blackQueens + whiteQueens + blackRooks + whiteRooks == 0 &&
                 (blackBishops + whiteBishops + blackKnights + whiteKnights) <= 3;
+    }
+
+    public boolean hasNonPawnMaterial() {
+        return blackQueens + whiteQueens + blackRooks + whiteRooks + blackBishops + whiteBishops
+                + blackKnights + whiteKnights > 0;
+    }
+
+    public float getEndgameWeight(boolean isWhite) {
+        if (isWhite) return clamp((1 - (blackQueens * 9 + blackRooks * 5 +
+                blackBishops * 3 + blackKnights * 3 + otherPieces * 0.5f) / 25.0f), 0, 1);
+        return clamp((1 - (whiteQueens * 9 + whiteRooks * 5 + whiteBishops * 3
+                + whiteKnights * 3 + otherPieces * 0.5f) / 25.0f), 0, 1);
     }
 
     public String toString() {

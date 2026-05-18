@@ -28,6 +28,10 @@ public class BotV2aEndgame implements Bot {
         int depthRemaining;
     }
 
+    public int getLastEval() {
+        return score;
+    }
+
     private static class StopSearchException extends RuntimeException {
         public StopSearchException() {
             super("StopSearchException");

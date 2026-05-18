@@ -41,6 +41,10 @@ public class BotV1Quiescence implements Bot {
         this.print = print;
     }
 
+    public int getLastEval() {
+        return score;
+    }
+
     public void setPrinting(boolean print) {
         this.print = print;
     }
