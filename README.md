@@ -19,7 +19,7 @@
 --add-modules javafx.controls,javafx.fxml,javafx.web
 --enable-native-access=javafx.graphics,javafx.media`
    8. Click OK
-6. You're ready!
+6. Go to Main.java and when ready, press the play button to start the program.
 
 ## Usage Instructions
 
