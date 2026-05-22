@@ -2,8 +2,8 @@ import app.Arrow;
 import app.Colors;
 import app.Div;
 import app.SoundHandler;
-import eval.Bot;
 import bot.archive.BotV3UsePartialSearch;
+import eval.Bot;
 import eval.BotV4UsePartialState;
 import game.FenUtils;
 import game.GameState;
@@ -113,6 +113,13 @@ public class Main extends Application {
     private int totalCurrMoves = 0;
     private int totalTestMoves = 0;
     private boolean darkMode = false;
+    private static boolean deepTest = false;
+    private static int testIdx = 0;
+    private static int currWins = 0;
+    private static int testWins = 0;
+    private static int draws = 0;
+    private static boolean promotionChoice = false;
+    private static byte[] promotionMove;
 
     // ==============================
     // Parameters
@@ -123,11 +130,6 @@ public class Main extends Application {
     private static final boolean debug = false;
     private static final boolean verbose = false;
     private static double allottedTime = 1.0;
-    private static boolean deepTest = false;
-    private static int testIdx = 0;
-    private static int currWins = 0;
-    private static int testWins = 0;
-    private static int draws = 0;
     private static final int N = 50;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
@@ -316,12 +318,13 @@ public class Main extends Application {
         darkRect.setOpacity(0);
         root.getChildren().add(darkRect);
 
-        div = new Div(5);
+        div = new Div(6);
         div.add(tfAllottedTime = getAllottedTimeTF());
-        div.add(getWhitePlayerButton());
         div.add(getBlackPlayerButton());
+        div.add(getWhitePlayerButton());
         div.add(btnDeepTest = getDeepTestButton());
         div.add(getDarkModeButton());
+        div.add(getResetButton());
         div.positionElements(scene);
         root.getChildren().addAll(div.getElements());
         root.getChildren().add(infoText = getInfoText());
@@ -382,8 +385,8 @@ public class Main extends Application {
         });
         blackPlayer.setOnAction(_ -> {
             blackPlayer.setStyle(btnHoverStyle);
-            if (!deepTest) blackPlayerHuman = !blackPlayerHuman;
-            if (!blackPlayerHuman && gameState.getColor() == -1) makeBotMoveAsync();
+            blackPlayerHuman = !blackPlayerHuman;
+            if (!deepTest && !blackPlayerHuman && gameState.getColor() == -1) makeBotMoveAsync();
             blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black Bot");
         });
         blackPlayer.setOnMousePressed(_ -> blackPlayer.setStyle(btnClickStyle));
@@ -403,8 +406,8 @@ public class Main extends Application {
         });
         whitePlayer.setOnAction(_ -> {
             whitePlayer.setStyle(btnHoverStyle);
-            if (!deepTest) whitePlayerHuman = !whitePlayerHuman;
-            if (!whitePlayerHuman && gameState.getColor() == 1) makeBotMoveAsync();
+            whitePlayerHuman = !whitePlayerHuman;
+            if (!deepTest && !whitePlayerHuman && gameState.getColor() == 1) makeBotMoveAsync();
             whitePlayer.setText(whitePlayerHuman ? "White Human" : "White Bot");
         });
         whitePlayer.setOnMousePressed(_ -> whitePlayer.setStyle(btnClickStyle));
@@ -474,6 +477,34 @@ public class Main extends Application {
         return btnDarkMode;
     }
 
+    private @NotNull Button getResetButton() {
+        Button btnReset = new Button("Reset Position");
+        btnReset.setStyle(btnStyle);
+        btnReset.setOnMouseEntered(_ -> {
+            btnReset.setStyle(btnHoverStyle);
+            scene.setCursor(Cursor.HAND);
+        });
+        btnReset.setOnMouseExited(_ -> {
+            btnReset.setStyle(btnStyle);
+            scene.setCursor(Cursor.DEFAULT);
+        });
+        btnReset.setOnAction(_ -> {
+            btnReset.setStyle(btnHoverStyle);
+            if (deepTest) return;
+            gameState = new GameState();
+            gameState.computeMoves();
+            fromSquare = -1;
+            toSquare = -1;
+            gameStateFuture.clear();
+            gameStateHistory.clear();
+            moveHistory.clear();
+            updateInfoText();
+            if (!whitePlayerHuman) makeBotMoveAsync();
+        });
+        btnReset.setOnMousePressed(_ -> btnReset.setStyle(btnClickStyle));
+        return btnReset;
+    }
+
     private @NotNull Text getInfoText() {
         infoText = new Text();
         infoText.setTranslateX(610);
@@ -487,18 +518,21 @@ public class Main extends Application {
         return infoText;
     }
 
+    private String evalToString(int eval, int depth) {
+        return eval >= Integer.MAX_VALUE / 2 - depth * 2 ?
+                "M" + (Integer.MAX_VALUE / 2 - eval) :
+                eval <= Integer.MIN_VALUE / 2 + depth * 2 ?
+                "M" + (eval - 1 - Integer.MIN_VALUE / 2) : "" + eval / 100f;
+    }
+
     private void updateInfoText() {
+        int eval = currBot.getLastEval();
+        int depth = currBot.getLastDepth();
         if (!deepTest) {
-            int eval = currBot.getLastEval();
-            int depth = currBot.getLastDepth();
             infoText.setText(String.format("""
-                            Depth: %d
-                            Eval: %s
-                            """, depth,
-                    eval >= Integer.MAX_VALUE / 2 - depth * 2 ?
-                            "M" + (Integer.MAX_VALUE / 2 - eval) :
-                            eval <= Integer.MIN_VALUE / 2 + depth * 2 ?
-                            "M" + (eval - 1 - Integer.MIN_VALUE / 2) : eval / 100f));
+                    Depth: %d
+                    Eval: %s
+                    """, depth, evalToString(eval, depth)));
             return;
         }
         infoText.setText(String.format("""
@@ -510,12 +544,14 @@ public class Main extends Application {
                         Curr Depth: %.2f
                         Test Depth: %.2f
                         Curr Color: %s
-                        Test Color: %s""",
+                        Test Color: %s
+                        
+                        Eval: %s""",
                 currWins, testWins, draws, pValue,
                 (double) totalCurrDepth / totalCurrMoves,
                 (double) totalTestDepth / totalTestMoves,
                 2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
-                2 * (testIdx % 2) - 1 == 1 ? "White" : "Black"));
+                2 * (testIdx % 2) - 1 == 1 ? "White" : "Black", evalToString(eval, depth)));
     }
 
     public void loop() {
@@ -567,6 +603,10 @@ public class Main extends Application {
     }
 
     private void undo() {
+        if (promotionChoice) {
+            promotionChoice = false;
+            return;
+        }
         if (gameStateHistory.isEmpty()) {
             SoundHandler.playSound("click");
             return;
@@ -642,6 +682,26 @@ public class Main extends Application {
         if (e.getButton() == MouseButton.BACK) undo();
         else if (e.getButton() == MouseButton.FORWARD) redo();
         if (e.getButton() != MouseButton.PRIMARY) return;
+        if (promotionChoice) {
+            promotionChoice = false;
+            int piece;
+            byte color = gameState.getColor();
+            int dest = promotionMove[0] == -2 ? promotionMove[1] - 8 * color : promotionMove[2];
+            if (square == dest) piece = 5;
+            else if (square == dest + 8 * color) piece = 2;
+            else if (square == dest + 16 * color) piece = 4;
+            else if (square == dest + 24 * color) piece = 3;
+            else piece = 0;
+            if (piece == 0) {
+                displayBoard();
+                return;
+            }
+            if (promotionMove[0] == -2) promotionMove[2] = (byte) (piece * color);
+            else promotionMove[0] = (byte) (-2 - piece);
+            makeMove(promotionMove);
+            displayBoard();
+            return;
+        }
         pencilMarkings.getChildren().clear();
         pencilScene.snapshot(pencilImage);
         if (square == -1) return;
@@ -659,6 +719,11 @@ public class Main extends Application {
             if (selectedSquare != square) firstSelection = true;
             scene.setCursor(Cursor.CLOSED_HAND);
             selectedSquare = square;
+            return;
+        } else if (move[0] <= -4 || move[0] == -2) {
+            getPromotionMove(move);
+            firstSelection = true;
+            selectedSquare = -1;
             return;
         }
         makeMove(move);
@@ -787,11 +852,36 @@ public class Main extends Application {
             firstSelection = true;
             selectedSquare = -1;
             return;
+        } else if (move[0] <= -4 || move[0] == -2) {
+            getPromotionMove(move);
+            firstSelection = true;
+            selectedSquare = -1;
+            return;
         }
         makeMove(move);
         if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
             makeBotMoveAsync();
         selectedSquare = -1;
+    }
+
+    private void getPromotionMove(byte[] move) {
+        byte color = gameState.getColor();
+        int dest = move[0] == -2 ? move[1] - 8 * color : move[2];
+        pieces[dest].setImage(imageCache.computeIfAbsent(5 * color, _ ->
+                new Image(new File("src/piece_images/" + 5 + color + ".png").toURI().toString())));
+        pieces[dest + 8 * color].setImage(imageCache.computeIfAbsent(2 * color, _ ->
+                new Image(new File("src/piece_images/" + 2 * color + ".png").toURI().toString())));
+        pieces[dest + 16 * color].setImage(imageCache.computeIfAbsent(4 * color, _ ->
+                new Image(new File("src/piece_images/" + 4 * color + ".png").toURI().toString())));
+        pieces[dest + 24 * color].setImage(imageCache.computeIfAbsent(3 * color, _ ->
+                new Image(new File("src/piece_images/" + 3 * color + ".png").toURI().toString())));
+        pieces[move[1]].setVisible(false);
+        pieces[dest].setVisible(true);
+        pieces[dest + 8 * color].setVisible(true);
+        pieces[dest + 16 * color].setVisible(true);
+        pieces[dest + 24 * color].setVisible(true);
+        promotionChoice = true;
+        promotionMove = move;
     }
 
     private void makeMove(int moveIdx) {
@@ -1073,11 +1163,11 @@ public class Main extends Application {
         double squareWidth = min(scene.getWidth(), scene.getHeight()) / 8;
         ImageView piece = pieces[i];
         if (pieceType == 0) {
-            piece.setVisible(false);
+            if (!promotionChoice) piece.setVisible(false);
             return;
         }
-        piece.setVisible(true);
-        piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
+        if (!promotionChoice) piece.setVisible(true);
+        if (!promotionChoice) piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
                 new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
         if (i == selectedSquare && dragging) {
             piece.setX(mousePose[0] - squareWidth / 2);
