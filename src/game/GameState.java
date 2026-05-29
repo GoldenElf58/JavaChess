@@ -1,5 +1,7 @@
 package game;
 
+import archive.game.MutableGameStateBishopAttacking;
+import archive.game.MutableGameStatePawnDefending;
 import eval.PieceSquareTables;
 
 import static java.lang.Math.abs;
@@ -940,6 +942,49 @@ public class GameState {
                 positionHistory, isWinner, winner, blackKnights, whiteKnights, blackBishops,
                 whiteBishops, blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
                 whiteKingSquare, blackKingSquare, zobrist, lastMove != null, getHash(), score);
+    }
+    public MutableGameStateBishopAttacking asMutableBishopAttacking() {
+        int score = 0;
+        byte blackRooks = 0;
+        byte whiteRooks = 0;
+        byte blackQueens = 0;
+        byte whiteQueens = 0;
+        byte piece;
+        for (byte i = 0; i < 64; i++) {
+            piece = board[i];
+            score += PieceSquareTables.getPieceSquareValue(piece, i);
+            if (piece == -4) blackRooks++;
+            else if (piece == -5) blackQueens++;
+            else if (piece == 4) whiteRooks++;
+            else if (piece == 5) whiteQueens++;
+        }
+        return new MutableGameStateBishopAttacking(board.clone(), whiteQueen, whiteKing, blackQueen, blackKing,
+                lastMove == null ? -1 : lastMove[1], halfMoves, halfMoveClock, whiteMove,
+                positionHistory, isWinner, winner, blackKnights, whiteKnights, blackBishops,
+                whiteBishops, blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
+                whiteKingSquare, blackKingSquare, zobrist, lastMove != null, getHash(), score, 0, 0);
+    }
+    public MutableGameStatePawnDefending asMutablePawnDefending() {
+        int score = 0;
+        byte blackRooks = 0;
+        byte whiteRooks = 0;
+        byte blackQueens = 0;
+        byte whiteQueens = 0;
+        byte piece;
+        for (byte i = 0; i < 64; i++) {
+            piece = board[i];
+            score += PieceSquareTables.getPieceSquareValue(piece, i);
+            if (piece == -4) blackRooks++;
+            else if (piece == -5) blackQueens++;
+            else if (piece == 4) whiteRooks++;
+            else if (piece == 5) whiteQueens++;
+        }
+        return new MutableGameStatePawnDefending(board.clone(), whiteQueen, whiteKing, blackQueen, blackKing,
+                lastMove == null ? -1 : lastMove[1], halfMoves, halfMoveClock, whiteMove,
+                positionHistory, isWinner, winner, blackKnights, whiteKnights, blackBishops,
+                whiteBishops, blackRooks, whiteRooks, blackQueens, whiteQueens, otherPieces,
+                whiteKingSquare, blackKingSquare, zobrist, lastMove != null, getHash(), score, 0,
+                0);
     }
 
     public String moveToString(int moveIdx) {

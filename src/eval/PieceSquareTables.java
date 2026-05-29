@@ -6,9 +6,9 @@ public class PieceSquareTables {
     /**
      * Get the value of a piece on a square
      *
-     * @param piece   Piece as an integer: 0=none, 1=pawn, 2=knight, 3=bishop, 4=rook, 5=queen,
-     *                6=king, negative piece for black.
-     * @param square  Square of the piece as an integer. Top left is 0, bottom right is 63.
+     * @param piece  Piece as an integer: 0=none, 1=pawn, 2=knight, 3=bishop, 4=rook, 5=queen,
+     *               6=king, negative piece for black.
+     * @param square Square of the piece as an integer. Top left is 0, bottom right is 63.
      * @return The score of the piece in its position.
      */
     public static int getPieceSquareValue(int piece, int square) {
@@ -60,21 +60,6 @@ public class PieceSquareTables {
             if (abs(piece) == 1 || abs(piece) == 6) {
                 eval -= getPieceSquareValue(piece, i);
                 eval += getPieceSquareValueEndgame(piece, i);
-            }
-        }
-        return eval;
-    }
-
-    public static int convertToEndgame(byte[] board, int curEval, float whiteEndgameWeight,
-                                       float blackEndgameWeight) {
-        byte piece;
-        int eval = curEval;
-        for (int i = 0; i < 64; i++) {
-            piece = board[i];
-            if (abs(piece) == 1 || abs(piece) == 6) {
-                eval += (int) ((getPieceSquareValueEndgame(piece, i) -
-                        getPieceSquareValue(piece, i)) * ((piece > 0) ?
-                        whiteEndgameWeight : blackEndgameWeight));
             }
         }
         return eval;

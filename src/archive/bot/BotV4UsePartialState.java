@@ -1,5 +1,6 @@
-package eval;
+package archive.bot;
 
+import eval.Bot;
 import game.GameState;
 import game.MutableGameState;
 import utils.Watch;
@@ -11,7 +12,7 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class BotVTest implements Bot {
+public class BotV4UsePartialState implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -37,9 +38,14 @@ public class BotVTest implements Bot {
         }
     }
 
-    public BotVTest(boolean log, boolean print) {
+    public BotV4UsePartialState(boolean log, boolean print) {
         this.log = log;
         this.print = print;
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName();
     }
 
     public void setPrinting(boolean print) {
@@ -75,7 +81,8 @@ public class BotVTest implements Bot {
         pools = new MutableGameState[10][218];
         while (watch.getElapsedTimeMillis() / 1000d < allottedTime) {
             if (!thread.isAlive()) {
-                if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
+                if (score >= Integer.MAX_VALUE / 2 - depth[0] * 2 ||
+                        score <= Integer.MIN_VALUE / 2 + depth[0] * 2) break;
                 thread = new Thread(() -> {
                     try {
                         pools = new MutableGameState[10][218];
@@ -129,7 +136,8 @@ public class BotVTest implements Bot {
         int move = -1;
         score = 0;
         while (depth <= maxDepth) {
-            if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
+            if (score >= Integer.MAX_VALUE / 2 - depth * 2 ||
+                    score <= Integer.MIN_VALUE / 2 + depth * 2) break;
             move = minimaxMove(state.asMutable(), depth, state.isWhiteMove(), move);
             depth++;
         }
@@ -180,10 +188,9 @@ public class BotVTest implements Bot {
             }
             int finalBestMoveIdx = bestMoveIdx;
             Arrays.sort(moveSearchOrder, (m1, m2) -> m1 == finalBestMoveIdx ? -1 :
-                    m2 == finalBestMoveIdx ? 1 :
-                    (isMaximizing ? -1 : 1) *
+             m2 == finalBestMoveIdx ? 1 : (isMaximizing ? -1 : 1) *
                     (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
-                     - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
+                            - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
         } else {
             nextStates = null;
             moveSearchOrder = null;
@@ -198,7 +205,7 @@ public class BotVTest implements Bot {
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (stopSearch) {
-                this.score = bestScore;
+                if (i > 0) this.score = bestScore;
                 return bestMoveIdx;
             }
             if (isMaximizing ? score > bestScore : score < bestScore) {
@@ -225,13 +232,6 @@ public class BotVTest implements Bot {
         } else thisEntry = new TTEntry();
         state.computeMoves();
         if (!state.isInProgress()) return state.getWinner() * Integer.MAX_VALUE / 2;
-        if (maxDepth - depth >= 4 && depth >= 3 && state.hasNonPawnMaterial() && !state.inCheck()) {
-            int score = -minimaxScore(state.makeNullMove(), depth + 1, maxDepth - 3, !isMaximizing,
-                    isMaximizing ? beta - 1 : alpha, isMaximizing ? beta : alpha + 1);
-            state.undoNullMove();
-            if (isMaximizing && score >= beta) return beta;
-            if (!isMaximizing && score <= alpha) return alpha;
-        }
 
         final Integer[] moveSearchOrder;
         final MutableGameState[] nextStates;

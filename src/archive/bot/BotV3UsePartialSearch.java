@@ -1,5 +1,6 @@
-package eval;
+package archive.bot;
 
+import eval.Bot;
 import game.GameState;
 import game.MutableGameState;
 import utils.Watch;
@@ -11,10 +12,7 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import static java.lang.Math.abs;
-import static java.lang.Math.max;
-
-public class BotVTestB implements Bot {
+public class BotV3UsePartialSearch implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -40,7 +38,7 @@ public class BotVTestB implements Bot {
         }
     }
 
-    public BotVTestB(boolean log, boolean print) {
+    public BotV3UsePartialSearch(boolean log, boolean print) {
         this.log = log;
         this.print = print;
     }
@@ -53,26 +51,8 @@ public class BotVTestB implements Bot {
         moveCache.clear();
     }
 
-    private int forceKingToCornerEval(MutableGameState state) {
-        int evaluation = 0;
-        float whiteEndgameWeight = state.getEndgameWeight(true);
-        float blackEndgameWeight = state.getEndgameWeight(false);
-        float whiteKingSquare = state.getWhiteKingSquare();
-        float blackKingSquare = state.getBlackKingSquare();
-        float kingDistance = max(abs(whiteKingSquare % 8 - blackKingSquare % 8),
-                abs(whiteKingSquare / 8 - blackKingSquare / 8));
-        evaluation -= (int) ((whiteEndgameWeight - blackEndgameWeight) * kingDistance);
-        float whiteKingCenterDistance = max(abs(whiteKingSquare % 8 - 3.5f),
-                abs(whiteKingSquare / 8 - 3.5f));
-        float blackKingCenterDistance = max(abs(blackKingSquare % 8 - 3.5f),
-                abs(blackKingSquare / 8 - 3.5f));
-        evaluation += (int) (blackKingCenterDistance * whiteEndgameWeight -
-                whiteKingCenterDistance * blackEndgameWeight);
-        return evaluation * 10;
-    }
-
-    private int evaluate(MutableGameState state, boolean partial) {
-        return (partial ? state.getCurEval() : state.getEvaluation()) + forceKingToCornerEval(state);
+    private int evaluate(MutableGameState state) {
+        return state.getEvaluation();
     }
 
     public int getMove(GameState state, double allottedTime) {
@@ -211,7 +191,7 @@ public class BotVTestB implements Bot {
 
         MutableGameState nextState;
         if (depth + 1 >= pools.length)
-            pools = new MutableGameState[max(depth, pools.length * 2) + 1][218];
+            pools = new MutableGameState[Math.max(depth, pools.length * 2) + 1][218];
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
             nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
@@ -235,7 +215,7 @@ public class BotVTestB implements Bot {
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
         if (stopSearch) return 0;
-        if (depth == maxDepth) return evaluate(state, false);
+        if (depth == maxDepth) return evaluate(state);
         long hashKey = state.getHash();
         TTEntry thisEntry;
         if (moveCache.containsKey(hashKey)) {
@@ -279,17 +259,16 @@ public class BotVTestB implements Bot {
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
-        MutableGameState nextState = null;
+        MutableGameState nextState;
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) {
                 state.makeMoveOnlyBoard(moveSearchOrder[i]);
                 nextState = nextStates[moveSearchOrder[i]];
-            } else if (depth + 1 != maxDepth) {
+            } else {
                 if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], i);
                 else pools[depth][0] = nextState = state.makeMove(i);
-            } else state.makeMoveOnlyBoardEval(i);
-            if (depth + 1 == maxDepth) score = evaluate(state, true);
-            else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
+            }
+            score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (stopSearch) return 0;
             if (isMaximizing ? score > bestScore : score < bestScore) {

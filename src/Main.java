@@ -2,9 +2,7 @@ import app.Arrow;
 import app.Colors;
 import app.Div;
 import app.SoundHandler;
-import bot.archive.BotV3UsePartialSearch;
-import eval.Bot;
-import eval.BotV4UsePartialState;
+import eval.*;
 import game.FenUtils;
 import game.GameState;
 import javafx.animation.AnimationTimer;
@@ -91,7 +89,7 @@ public class Main extends Application {
     private ImageView[] pieces;
     private final Rectangle[] borders = new Rectangle[2];
 
-    private Button btnDeepTest;
+    private Button btnDeepTest, btnReset;
     private TextField tfAllottedTime;
     private Div div;
     private Text infoText;
@@ -114,6 +112,7 @@ public class Main extends Application {
     private int totalTestMoves = 0;
     private boolean darkMode = false;
     private static boolean deepTest = false;
+    private static boolean deepTestPaused = false;
     private static int testIdx = 0;
     private static int currWins = 0;
     private static int testWins = 0;
@@ -124,22 +123,22 @@ public class Main extends Application {
     // ==============================
     // Parameters
     // ==============================
-    private static final boolean runBenchmarkOnly = false;
+    private static final boolean runBenchmarkOnly = true;
     private static boolean whitePlayerHuman = true;
     private static boolean blackPlayerHuman = true;
     private static final boolean debug = false;
     private static final boolean verbose = false;
     private static double allottedTime = 1.0;
-    private static final int N = 50;
+    private static final int N = 15;
     private static final int warmup = N / 10;
     private static final int maxDepth = 4;
     private static final boolean useCurrBot = true;
-    private static final boolean useTestBot = false;
-    private static final boolean useBot1Move = true;
+    private static final boolean useTestBot = true;
+    private static final boolean useCurrBotMove = true;
     private static final boolean useTestBotMove = false;
 
-    private final Bot currBot = new BotV4UsePartialState(false, true);
-    private final Bot testBot = new BotV4UsePartialState(false, true);
+    private static final Bot currBot = new BotV7BetterSorting(false, true);
+    private static final Bot testBot = new BotV7BetterSorting(false, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
@@ -156,8 +155,8 @@ public class Main extends Application {
         long[] perGame = new long[N];
         long[] oldTimes = new long[N];
         long[] newTimes = new long[N];
-        BotV3UsePartialSearch currBot = new BotV3UsePartialSearch(false, false);
-        BotV4UsePartialState testBot = new BotV4UsePartialState(false, false);
+        currBot.setPrinting(false);
+        testBot.setPrinting(false);
         Random random = new Random();
         Watch watch = new Watch();
         Watch oldWatch = new Watch();
@@ -202,14 +201,14 @@ public class Main extends Application {
                 int move = random.nextInt(gameState.getMoveCount());
                 oldWatch.start();
                 if (useCurrBot) {
-                    move = useBot1Move ? currBot.iterativeDeepening(gameState, maxDepth) : move;
-                    if (!useCurrBot) currBot.iterativeDeepening(gameState, maxDepth);
+                    move = useCurrBotMove ? currBot.iterativeDeepening(gameState, maxDepth) : move;
+                    if (!useCurrBotMove) currBot.iterativeDeepening(gameState, maxDepth);
                 }
                 oldWatch.stop();
                 newWatch.start();
                 if (useTestBot) {
                     move = useTestBotMove ? testBot.iterativeDeepening(gameState, maxDepth) : move;
-                    if (!useTestBot) testBot.iterativeDeepening(gameState, maxDepth);
+                    if (!useTestBotMove) testBot.iterativeDeepening(gameState, maxDepth);
                 }
                 newWatch.stop();
                 gameState = gameState.makeMove(move);
@@ -244,17 +243,26 @@ public class Main extends Application {
         }
         watch.stop();
         IO.println("\n");
+        long oldAverage = Arrays.stream(oldTimes).sum() / N;
+        long newAverage = Arrays.stream(newTimes).sum() / N;
+        double percent = (double) newAverage / oldAverage * 100;
+        percent = round(percent * 1000) / 1000d;
         System.out.printf("Max depth: %d%n", maxDepth);
         System.out.printf("Use Curr Bot: %b%n", useCurrBot);
         System.out.printf("Use Test Bot: %b%n", useTestBot);
-        System.out.printf("Old time Average: %s%n", time(Arrays.stream(oldTimes).sum() / N));
-        System.out.printf("New time Average: %s%n", time(Arrays.stream(newTimes).sum() / N));
+        System.out.printf("Use Curr Bot Move: %b%n", useCurrBotMove);
+        System.out.printf("Use Test Bot Move: %b%n", useTestBotMove);
+        System.out.printf("Curr Bot Name: %s%n", currBot);
+        System.out.printf("Test Bot Name: %s%n", testBot);
+        System.out.printf("Old time Average: %s%n", time(oldAverage));
+        System.out.printf("New time Average: %s%n", time(newAverage));
         System.out.printf("Old time Standard Deviation: %s%n", time(round(stdDev(oldTimes))));
         System.out.printf("New time Standard Deviation: %s%n", time(round(stdDev(newTimes))));
         double[] ciOld = confidenceInterval95(oldTimes);
         double[] ciNew = confidenceInterval95(newTimes);
         System.out.printf("Old time 95%% CI: (%s, %s)%n", time(round(ciOld[0])), time(round(ciOld[1])));
         System.out.printf("New time 95%% CI: (%s, %s)%n", time(round(ciNew[0])), time(round(ciNew[1])));
+        System.out.printf("Percent of Old: %s%%%n", percent);
         System.out.printf("Half moves: %,d%n", totalHalfMoves);
         System.out.printf("Games: %,d%n", N);
         System.out.printf("Time: %s%n", watch);
@@ -324,7 +332,7 @@ public class Main extends Application {
         div.add(getWhitePlayerButton());
         div.add(btnDeepTest = getDeepTestButton());
         div.add(getDarkModeButton());
-        div.add(getResetButton());
+        div.add(btnReset = getResetButton());
         div.positionElements(scene);
         root.getChildren().addAll(div.getElements());
         root.getChildren().add(infoText = getInfoText());
@@ -386,7 +394,8 @@ public class Main extends Application {
         blackPlayer.setOnAction(_ -> {
             blackPlayer.setStyle(btnHoverStyle);
             blackPlayerHuman = !blackPlayerHuman;
-            if (!deepTest && !blackPlayerHuman && gameState.getColor() == -1) makeBotMoveAsync();
+            if (!deepTest && !deepTestPaused && !blackPlayerHuman && gameState.getColor() == -1)
+                makeBotMoveAsync();
             blackPlayer.setText(blackPlayerHuman ? "Black Human" : "Black Bot");
         });
         blackPlayer.setOnMousePressed(_ -> blackPlayer.setStyle(btnClickStyle));
@@ -407,7 +416,8 @@ public class Main extends Application {
         whitePlayer.setOnAction(_ -> {
             whitePlayer.setStyle(btnHoverStyle);
             whitePlayerHuman = !whitePlayerHuman;
-            if (!deepTest && !whitePlayerHuman && gameState.getColor() == 1) makeBotMoveAsync();
+            if (!deepTest && !deepTestPaused && !whitePlayerHuman && gameState.getColor() == 1)
+                makeBotMoveAsync();
             whitePlayer.setText(whitePlayerHuman ? "White Human" : "White Bot");
         });
         whitePlayer.setOnMousePressed(_ -> whitePlayer.setStyle(btnClickStyle));
@@ -427,9 +437,25 @@ public class Main extends Application {
         });
         deepTest.setOnAction(_ -> {
             deepTest.setStyle(btnHoverStyle);
+            if (deepTestPaused) {
+                deepTestPaused = false;
+                Main.deepTest = true;
+                whitePlayerHuman = false;
+                blackPlayerHuman = false;
+                allottedTime = 0.1;
+                tfAllottedTime.setText(String.valueOf(allottedTime));
+                deepTest.setText("Stop");
+                btnReset.setText("Pause");
+                currBot.setPrinting(false);
+                testBot.setPrinting(false);
+                updateInfoText();
+                gameState.computeMoves();
+                makeBotMoveAsync();
+                return;
+            }
             Main.deepTest = !Main.deepTest;
-            whitePlayerHuman = !Main.deepTest;
-            blackPlayerHuman = !Main.deepTest;
+            whitePlayerHuman = true;
+            blackPlayerHuman = true;
             allottedTime = 0.1;
             testIdx = 0;
             tfAllottedTime.setText(String.valueOf(allottedTime));
@@ -437,6 +463,11 @@ public class Main extends Application {
             currBot.setPrinting(!Main.deepTest);
             testBot.setPrinting(!Main.deepTest);
             if (Main.deepTest) {
+                IO.println("Deep Test");
+                IO.println("Curr Bot: " + currBot);
+                IO.println("Test Bot: " + testBot);
+                btnReset.setText("Pause");
+                deepTestPaused = false;
                 currBot.clearCache();
                 testBot.clearCache();
                 currWins = 0;
@@ -449,7 +480,10 @@ public class Main extends Application {
                 gameState = FenUtils.getFenGameState(testIdx);
                 gameState.computeMoves();
                 makeBotMoveAsync();
-            } else infoText.setText("");
+                return;
+            }
+            infoText.setText("");
+            btnReset.setText("Reset Position");
         });
         deepTest.setOnMousePressed(_ -> deepTest.setStyle(btnClickStyle));
         return deepTest;
@@ -490,7 +524,17 @@ public class Main extends Application {
         });
         btnReset.setOnAction(_ -> {
             btnReset.setStyle(btnHoverStyle);
-            if (deepTest) return;
+            if (deepTest) {
+                btnReset.setText("Paused");
+                btnDeepTest.setText("Resume");
+                deepTestPaused = true;
+                deepTest = false;
+                whitePlayerHuman = true;
+                blackPlayerHuman = true;
+                return;
+            }
+            if (deepTestPaused) return;
+            btnReset.setText("Reset Position");
             gameState = new GameState();
             gameState.computeMoves();
             fromSquare = -1;
@@ -525,10 +569,17 @@ public class Main extends Application {
                 "M" + (eval - 1 - Integer.MIN_VALUE / 2) : "" + eval / 100f;
     }
 
+    private void updateInfoTextDeepTest() {
+        boolean tmp = Main.deepTest;
+        Main.deepTest = true;
+        updateInfoText();
+        Main.deepTest = tmp;
+    }
+
     private void updateInfoText() {
         int eval = currBot.getLastEval();
         int depth = currBot.getLastDepth();
-        if (!deepTest) {
+        if (!deepTest && !deepTestPaused) {
             infoText.setText(String.format("""
                     Depth: %d
                     Eval: %s
@@ -546,18 +597,22 @@ public class Main extends Application {
                         Curr Color: %s
                         Test Color: %s
                         
-                        Eval: %s""",
+                        Eval: %s
+                        
+                        Curr Name: %s
+                        Test Name: %s""",
                 currWins, testWins, draws, pValue,
                 (double) totalCurrDepth / totalCurrMoves,
                 (double) totalTestDepth / totalTestMoves,
                 2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
-                2 * (testIdx % 2) - 1 == 1 ? "White" : "Black", evalToString(eval, depth)));
+                2 * (testIdx % 2) - 1 == 1 ? "White" : "Black", evalToString(eval, depth),
+                currBot, testBot));
     }
 
     public void loop() {
         displayBoard();
 
-        if (!gameState.isInProgress() && !shown && !deepTest) {
+        if (!gameState.isInProgress() && !shown && !deepTest && !deepTestPaused) {
             SoundHandler.playSound("game-end");
             IO.println(gameState);
             IO.println((switch (gameState.getWinner()) {
@@ -970,7 +1025,7 @@ public class Main extends Application {
                         (double) totalCurrDepth / totalCurrMoves) +
                         " Test Depth: " + String.format("%.2f",
                         (double) totalTestDepth / totalTestMoves));
-                Platform.runLater(this::updateInfoText);
+                Platform.runLater(this::updateInfoTextDeepTest);
                 if (testIdx >= 1000 || pValue <= .003) {
                     deepTest = false;
                     testIdx = 0;
@@ -978,7 +1033,12 @@ public class Main extends Application {
                     blackPlayerHuman = true;
                     currBot.setPrinting(true);
                     testBot.setPrinting(true);
-                    Platform.runLater(() -> btnDeepTest.setText("Deep Test"));
+                    Platform.runLater(() -> {
+                        btnDeepTest.setText("Deep Test");
+                        btnReset.setText("Reset Position");
+                        SoundHandler.playSound("game-end");
+                    });
+                    shown = true;
                     if (pValue <= .003 && testIdx < 1000)
                         IO.println("Automatically stopped at p = " + String.format("%.4f", pValue));
                     return;
@@ -1007,7 +1067,7 @@ public class Main extends Application {
             }
             Platform.runLater(this::updateInfoText);
             gameState.computeMoves();
-            if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman)
+            if (deepTest || (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman))
                 makeBotMoveAsync();
         }).start();
     }
@@ -1051,7 +1111,7 @@ public class Main extends Application {
             if (!wasVisible) scene.getRoot().requestFocus();
             infoText.setTranslateX((width - height) / 2 + height + 10);
             infoText.setWrappingWidth(clamp((width - height) / 2 - 20, 100,
-                    clamp(120 * height / 480, 120, 220)));
+                    clamp(150 * height / 480, 120, 220)));
             infoText.setFont(new Font(clamp(height / 480 * 12, 12, 20)));
         }
         if (width < 292 - 28) {

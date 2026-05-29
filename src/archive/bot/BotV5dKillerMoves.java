@@ -1,4 +1,4 @@
-package bot.archive;
+package archive.bot;
 
 import eval.Bot;
 import game.GameState;
@@ -12,7 +12,9 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class BotV2bEndgame implements Bot {
+import static java.lang.Math.max;
+
+public class BotV5dKillerMoves implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -26,6 +28,7 @@ public class BotV2bEndgame implements Bot {
     private static class TTEntry {
         int score;
         int depthRemaining;
+        byte killerMoveIdx;
     }
 
     public int getLastEval() {
@@ -38,9 +41,14 @@ public class BotV2bEndgame implements Bot {
         }
     }
 
-    public BotV2bEndgame(boolean log, boolean print) {
+    public BotV5dKillerMoves(boolean log, boolean print) {
         this.log = log;
         this.print = print;
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName();
     }
 
     public void setPrinting(boolean print) {
@@ -51,12 +59,8 @@ public class BotV2bEndgame implements Bot {
         moveCache.clear();
     }
 
-    private int evaluate(MutableGameState state) {
-        if (state.isPawnEndgame())
-            return eval.PieceSquareTables.convertToEndgame(state.getBoard(), state.getEvaluation());
-        else if (state.isKingEndgame())
-            return eval.PieceSquareTables.convertToKingEndgame(state.getBoard(), state.getEvaluation());
-        return state.getEvaluation();
+    private int evaluate(MutableGameState state, boolean partial) {
+        return partial ? state.getCurEval() : state.getEvaluation();
     }
 
     public int getMove(GameState state, double allottedTime) {
@@ -80,7 +84,8 @@ public class BotV2bEndgame implements Bot {
         pools = new MutableGameState[10][218];
         while (watch.getElapsedTimeMillis() / 1000d < allottedTime) {
             if (!thread.isAlive()) {
-                if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
+                if (score >= Integer.MAX_VALUE / 2 - depth[0] * 2 ||
+                        score <= Integer.MIN_VALUE / 2 + depth[0] * 2) break;
                 thread = new Thread(() -> {
                     try {
                         pools = new MutableGameState[10][218];
@@ -134,7 +139,8 @@ public class BotV2bEndgame implements Bot {
         int move = -1;
         score = 0;
         while (depth <= maxDepth) {
-            if (score == Integer.MAX_VALUE / 2 || score == Integer.MIN_VALUE / 2) break;
+            if (score >= Integer.MAX_VALUE / 2 - depth * 2 ||
+                    score <= Integer.MIN_VALUE / 2 + depth * 2) break;
             move = minimaxMove(state.asMutable(), depth, state.isWhiteMove(), move);
             depth++;
         }
@@ -185,9 +191,9 @@ public class BotV2bEndgame implements Bot {
             }
             int finalBestMoveIdx = bestMoveIdx;
             Arrays.sort(moveSearchOrder, (m1, m2) -> m1 == finalBestMoveIdx ? -1 :
-                    m2 == finalBestMoveIdx ? 1 : (isMaximizing ? -1 : 1) *
-                                                 (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
-                                                  - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
+             m2 == finalBestMoveIdx ? 1 : (isMaximizing ? -1 : 1) *
+                    (moveCache.getOrDefault(nextStates[m1].getHash(), emptyTT).score
+                            - moveCache.getOrDefault(nextStates[m2].getHash(), emptyTT).score));
         } else {
             nextStates = null;
             moveSearchOrder = null;
@@ -195,7 +201,7 @@ public class BotV2bEndgame implements Bot {
 
         MutableGameState nextState;
         if (depth + 1 >= pools.length)
-            pools = new MutableGameState[Math.max(depth, pools.length * 2) + 1][218];
+            pools = new MutableGameState[max(depth, pools.length * 2) + 1][218];
         for (int i = 0; i < state.getMoveCount(); i++) {
             if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
             nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
@@ -219,7 +225,7 @@ public class BotV2bEndgame implements Bot {
     private int minimaxScore(MutableGameState state, int depth, int maxDepth, boolean isMaximizing,
                              int alpha, int beta) {
         if (stopSearch) return 0;
-        if (depth == maxDepth) return evaluate(state);
+        if (depth == maxDepth) return evaluate(state, false);
         long hashKey = state.getHash();
         TTEntry thisEntry;
         if (moveCache.containsKey(hashKey)) {
@@ -263,23 +269,36 @@ public class BotV2bEndgame implements Bot {
 
         int bestScore = isMaximizing ? Integer.MIN_VALUE / 2 : Integer.MAX_VALUE / 2;
         int score;
-        MutableGameState nextState;
-        for (int i = 0; i < state.getMoveCount(); i++) {
-            if (sortMoves) {
-                state.makeMoveOnlyBoard(moveSearchOrder[i]);
-                nextState = nextStates[moveSearchOrder[i]];
+        MutableGameState nextState = null;
+        byte searchIdx;
+        for (int i = -1; i < state.getMoveCount(); i++) {
+            if (i == -1) {
+                if (thisEntry.killerMoveIdx > -1 && thisEntry.killerMoveIdx < state.getMoveCount())
+                    searchIdx = thisEntry.killerMoveIdx;
+                else continue;
             } else {
-                if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], i);
-                else pools[depth][0] = nextState = state.makeMove(i);
+                searchIdx = (byte) (sortMoves ? moveSearchOrder[i] : i);
+                if (searchIdx == thisEntry.killerMoveIdx) continue;
             }
-            score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
+            if (sortMoves) {
+                state.makeMoveOnlyBoard(searchIdx);
+                nextState = nextStates[searchIdx];
+            } else if (depth + 1 != maxDepth) {
+                if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], searchIdx);
+                else pools[depth][0] = nextState = state.makeMove(searchIdx);
+            } else state.makeMoveOnlyBoardEval(searchIdx);
+            if (depth + 1 == maxDepth) score = evaluate(state, true);
+            else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (stopSearch) return 0;
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
                 if (isMaximizing) alpha = score;
                 else beta = score;
-                if (beta <= alpha) break;
+                if (beta <= alpha) {
+                    thisEntry.killerMoveIdx = searchIdx;
+                    break;
+                }
             }
         }
         if (isMaximizing ? bestScore >= Integer.MAX_VALUE / 2 - 256 :
