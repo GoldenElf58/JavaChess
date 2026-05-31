@@ -1,5 +1,6 @@
-package eval;
+package archive.bot;
 
+import eval.Bot;
 import game.GameState;
 import game.MutableGameState;
 import utils.Logger;
@@ -10,7 +11,7 @@ import java.util.HashMap;
 
 import static java.lang.Math.max;
 
-public class BotV7BetterSorting implements Bot {
+public class BotV9dLMR implements Bot {
 
     private int score;
     private final HashMap<Long, TTEntry> moveCache = new HashMap<>();
@@ -22,8 +23,14 @@ public class BotV7BetterSorting implements Bot {
 
     private static class TTEntry {
         int score;
-        int depthRemaining;
+        byte depthRemaining;
         byte killerMoveIdx;
+        byte bestMoveIdx;
+
+        TTEntry() {
+            killerMoveIdx = -1;
+            bestMoveIdx = -1;
+        }
     }
 
     public int getLastEval() {
@@ -36,7 +43,7 @@ public class BotV7BetterSorting implements Bot {
         }
     }
 
-    public BotV7BetterSorting(boolean log, boolean print) {
+    public BotV9dLMR(boolean log, boolean print) {
         this.log = log;
         this.print = print;
     }
@@ -170,20 +177,32 @@ public class BotV7BetterSorting implements Bot {
         }
 
         MutableGameState nextState;
+        byte searchIdx;
+        TTEntry thisEntry = moveCache.getOrDefault(state.getHash(), new TTEntry());
         if (depth + 1 >= pools.length)
             pools = new MutableGameState[max(depth, pools.length * 2) + 1][218];
-        for (int i = 0; i < state.getMoveCount(); i++) {
-            if (sortMoves) state.makeMoveOnlyBoard(moveSearchOrder[i]);
-            nextState = sortMoves ? nextStates[moveSearchOrder[i]] : state.makeMove(i);
+        for (int i = -2; i < state.getMoveCount(); i++) {
+            if (i <= 0) {
+                searchIdx = i == -2 ? (byte) bestMoveIdx : i == -1 ? thisEntry.bestMoveIdx :
+                                                           thisEntry.killerMoveIdx;
+                if (searchIdx < 0 || searchIdx >= state.getMoveCount()) continue;
+                if (i > -2 && searchIdx == bestMoveIdx) continue;
+            } else {
+                searchIdx = (byte) (sortMoves ? moveSearchOrder[i] : i);
+                if (searchIdx == thisEntry.killerMoveIdx || searchIdx == thisEntry.bestMoveIdx)
+                    continue;
+            }
+            if (sortMoves) state.makeMoveOnlyBoard(searchIdx);
+            nextState = sortMoves ? nextStates[searchIdx] : state.makeMove(searchIdx);
             int score = minimaxScore(nextState, 1, depth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (stopSearch) {
-                if (i > 0) this.score = bestScore;
+                if (i > -2) this.score = bestScore;
                 return bestMoveIdx;
             }
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
-                bestMoveIdx = sortMoves ? moveSearchOrder[i] : i;
+                bestMoveIdx = searchIdx;
                 if (isMaximizing) alpha = score;
                 else beta = score;
             }
@@ -245,28 +264,34 @@ public class BotV7BetterSorting implements Bot {
         int score;
         MutableGameState nextState = null;
         byte searchIdx;
-        for (int i = -1; i < state.getMoveCount(); i++) {
-            if (i == -1) {
-                if (thisEntry.killerMoveIdx > -1 && thisEntry.killerMoveIdx < state.getMoveCount())
-                    searchIdx = thisEntry.killerMoveIdx;
-                else continue;
+        for (int i = -2; i < state.getMoveCount(); i++) {
+            if (i < 0) {
+                searchIdx = i == -2 ? thisEntry.bestMoveIdx : thisEntry.killerMoveIdx;
+                if (searchIdx < 0 || searchIdx >= state.getMoveCount()) continue;
             } else {
                 searchIdx = (byte) (sortMoves ? moveSearchOrder[i] : i);
-                if (!sortMoves && searchIdx == thisEntry.killerMoveIdx) continue;
+                if (searchIdx == thisEntry.killerMoveIdx || searchIdx == thisEntry.bestMoveIdx)
+                    continue;
             }
             if (sortMoves) {
                 state.makeMoveOnlyBoard(searchIdx);
                 nextState = nextStates[searchIdx];
             } else if (depth + 1 != maxDepth) {
-                if (pools[depth][0] != null) nextState = state.loadMoveTo(pools[depth][0], searchIdx);
+                if (pools[depth][0] != null)
+                    nextState = state.loadMoveTo(pools[depth][0], searchIdx);
                 else pools[depth][0] = nextState = state.makeMove(searchIdx);
             } else state.makeMoveOnlyBoardEval(searchIdx);
             if (depth + 1 == maxDepth) score = evaluate(state, true);
+            else if (maxDepth - depth <= 3 && i > 3 && !nextState.inCheck() &&
+                    nextState.numPieces() == state.numPieces())
+                score = minimaxScore(nextState, depth + 1, maxDepth - 1, !isMaximizing, alpha,
+                        beta);
             else score = minimaxScore(nextState, depth + 1, maxDepth, !isMaximizing, alpha, beta);
             state.undoMove();
             if (stopSearch) return 0;
             if (isMaximizing ? score > bestScore : score < bestScore) {
                 bestScore = score;
+                thisEntry.bestMoveIdx = searchIdx;
                 if (isMaximizing) alpha = score;
                 else beta = score;
                 if (beta <= alpha) {
@@ -279,7 +304,7 @@ public class BotV7BetterSorting implements Bot {
                 bestScore <= -Integer.MAX_VALUE / 2 + 256)
             bestScore -= (isMaximizing ? 1 : -1);
         thisEntry.score = bestScore;
-        thisEntry.depthRemaining = maxDepth - depth;
+        thisEntry.depthRemaining = (byte) (maxDepth - depth);
         moveCache.put(hashKey, thisEntry);
         return bestScore;
     }

@@ -2,12 +2,10 @@ import app.Arrow;
 import app.Colors;
 import app.Div;
 import app.SoundHandler;
-import eval.BotV7BetterSorting;
 import eval.Bot;
+import eval.BotV9fLMR;
 import game.FenUtils;
 import game.GameState;
-import utils.Watch;
-
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -34,13 +32,13 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
+import utils.Watch;
 
 import java.io.File;
 import java.util.*;
 
 import static java.lang.Math.*;
 import static java.lang.String.format;
-
 import static utils.Watch.time;
 
 public class Main extends Application {
@@ -111,6 +109,7 @@ public class Main extends Application {
     private volatile boolean appOpen = true;
     private double pValue;
     private double llr;
+    private double pConclusive;
     private final int[] currDepths = new int[64];
     private final int[] testDepths = new int[64];
     private boolean darkMode = false;
@@ -142,8 +141,8 @@ public class Main extends Application {
     private static final boolean useCurrBotMove = true;
     private static final boolean useTestBotMove = false;
 
-    private static final Bot currBot = new BotV7BetterSorting(false, true);
-    private static final Bot testBot = new BotV7BetterSorting(false, true);
+    private static final Bot currBot = new BotV9fLMR(false, true);
+    private static final Bot testBot = new BotV9fLMR(false, true);
 
     @SuppressWarnings({"UnnecessaryModifier", "unused"})
     public static void main(String[] args) {
@@ -616,11 +615,12 @@ public class Main extends Application {
     private void printHistogram(int[] histogram) {
         int total = Arrays.stream(histogram).sum();
         int rollingTotal = 0;
+        IO.println(format("Average: %.3f", trimmedMean(histogram)));
         for (int i = 0; i < histogram.length; i++) {
             rollingTotal += histogram[i];
-            if (histogram[i] / (double) total < .01) continue;
+            if (histogram[i] / (double) total < .001) continue;
             System.out.printf("%s: %.1f%%%n", i, (double) histogram[i] / total * 100);
-            if ((double) rollingTotal / total > .99) break;
+            if ((double) rollingTotal / total > .999) break;
         }
     }
 
@@ -638,8 +638,10 @@ public class Main extends Application {
                         Curr Wins: %s
                         Test Wins: %s
                         Draws: %s
+                        
                         P-Value: %.4f
                         LLR: %.3f
+                        P-Conclusive: %.4f
                         
                         Curr Depth: %.2f
                         Test Depth: %.2f
@@ -650,7 +652,7 @@ public class Main extends Application {
                         
                         Curr Name: %s
                         Test Name: %s""",
-                losses, wins, draws, pValue, llr,
+                losses, wins, draws, pValue, llr, pConclusive,
                 trimmedMean(currDepths), trimmedMean(testDepths),
                 2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
                 2 * (testIdx % 2) - 1 == 1 ? "White" : "Black", evalToString(eval, depth),
@@ -1181,7 +1183,7 @@ public class Main extends Application {
                 testIdx++;
                 pValue = getPValue(losses, draws, wins);
                 llr = SPRT();
-                double pConclusive = probabilityConclusive(llr);
+                pConclusive = probabilityConclusive(llr);
                 IO.println("Curr Wins: " + losses + " Test Wins: " + wins +
                         " Draws: " + draws + " P-Value: " + format("%.4f", pValue) +
                         " LLR: " + format("%.3f", llr) +
@@ -1197,7 +1199,8 @@ public class Main extends Application {
                     if (pValue < .001)
                         IO.println("Automatically stopped at p = " + format("%.4f", pValue));
                     if (pConclusive < .01)
-                        IO.println("Automatically stopped at pConclusive = " + format("%.4f", pConclusive));
+                        IO.println("Automatically stopped at pConclusive = " +
+                                format("%.4f", pConclusive));
                     deepTest = false;
                     testIdx = 0;
                     whitePlayerHuman = true;
@@ -1230,10 +1233,10 @@ public class Main extends Application {
         selectedSquare = -1;
         new Thread(() -> {
             makeMove((deepTest && (gameState.getColor() == 2 * (testIdx % 2) - 1) ?
-//                    testBot.getMove(gameState, allottedTime) :
-                    testBot.iterativeDeepening(gameState, 2) :
-//                    currBot.getMove(gameState, allottedTime)));
-                    currBot.iterativeDeepening(gameState, 2)));
+                    testBot.getMove(gameState, allottedTime) :
+//                    testBot.iterativeDeepening(gameState, 2) :
+                    currBot.getMove(gameState, allottedTime)));
+//                    currBot.iterativeDeepening(gameState, 2)));
             if (gameState.getColor() == 2 * (testIdx % 2) - 1)
                 currDepths[min(currBot.getLastDepth(), 63)]++;
             else testDepths[min(testBot.getLastDepth(), 63)]++;
@@ -1500,7 +1503,8 @@ public class Main extends Application {
     }
 
     public static boolean canSelectSquare(GameState gameState, int from, int to) {
-        if (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman) return false;
+        if (deepTest || (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman))
+            return false;
         boolean isColor = gameState.getBoard()[to] * gameState.getColor() > 0;
         if (isColor) return true;
         if (to == from || !gameState.isInProgress()) return false;

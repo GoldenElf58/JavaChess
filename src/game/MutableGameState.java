@@ -1096,6 +1096,11 @@ public class MutableGameState {
         }
     }
 
+    public byte numPieces() {
+        return (byte) (blackQueens + whiteQueens + blackRooks + whiteRooks +
+                blackBishops + whiteBishops + blackKnights + whiteKnights + otherPieces);
+    }
+
     public boolean isKingEndgame() {
         return blackQueens + whiteQueens == 0 &&
                 2 * (blackBishops + whiteBishops + blackKnights + whiteKnights) +
