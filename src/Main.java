@@ -2,9 +2,12 @@ import app.Arrow;
 import app.Colors;
 import app.Div;
 import app.SoundHandler;
-import eval.*;
+import eval.BotV7BetterSorting;
+import eval.Bot;
 import game.FenUtils;
 import game.GameState;
+import utils.Watch;
+
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -31,12 +34,13 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
-import utils.Watch;
 
 import java.io.File;
 import java.util.*;
 
 import static java.lang.Math.*;
+import static java.lang.String.format;
+
 import static utils.Watch.time;
 
 public class Main extends Application {
@@ -106,32 +110,33 @@ public class Main extends Application {
     private boolean shift = false;
     private volatile boolean appOpen = true;
     private double pValue;
-    private int totalCurrDepth = 0;
-    private int totalTestDepth = 0;
-    private int totalCurrMoves = 0;
-    private int totalTestMoves = 0;
+    private double llr;
+    private final int[] currDepths = new int[64];
+    private final int[] testDepths = new int[64];
     private boolean darkMode = false;
     private static boolean deepTest = false;
     private static boolean deepTestPaused = false;
     private static int testIdx = 0;
-    private static int currWins = 0;
-    private static int testWins = 0;
+    private static int wins = 0;
     private static int draws = 0;
+    private static int losses = 0;
+    private static double lastScore = 0;
+    private static int[] penta = new int[5];
     private static boolean promotionChoice = false;
     private static byte[] promotionMove;
 
     // ==============================
     // Parameters
     // ==============================
-    private static final boolean runBenchmarkOnly = true;
+    private static final boolean runBenchmarkOnly = false;
     private static boolean whitePlayerHuman = true;
     private static boolean blackPlayerHuman = true;
     private static final boolean debug = false;
     private static final boolean verbose = false;
     private static double allottedTime = 1.0;
-    private static final int N = 15;
-    private static final int warmup = N / 10;
-    private static final int maxDepth = 4;
+    private static final int N = 2;
+    private static final int warmup = N / 10 + 1;
+    private static final int maxDepth = 5;
     private static final boolean useCurrBot = true;
     private static final boolean useTestBot = true;
     private static final boolean useCurrBotMove = true;
@@ -164,7 +169,7 @@ public class Main extends Application {
         int totalBars = 20;
         System.out.printf("\r0%% [%s] [0s]", "░".repeat(totalBars));
         if (maxDepth > 3) {
-            for (int i = 0; i < (warmup + 1) * maxDepth; i++) {
+            for (int i = 0; i < warmup * maxDepth * maxDepth; i++) {
                 gameState = new GameState();
                 gameState.computeMoves();
                 int movesThisGame = 0;
@@ -470,8 +475,9 @@ public class Main extends Application {
                 deepTestPaused = false;
                 currBot.clearCache();
                 testBot.clearCache();
-                currWins = 0;
-                testWins = 0;
+                penta = new int[5];
+                losses = 0;
+                wins = 0;
                 draws = 0;
                 gameStateFuture.clear();
                 gameStateHistory.clear();
@@ -482,6 +488,10 @@ public class Main extends Application {
                 makeBotMoveAsync();
                 return;
             }
+            IO.println(currBot);
+            printHistogram(currDepths);
+            IO.println(testBot);
+            printHistogram(testDepths);
             infoText.setText("");
             btnReset.setText("Reset Position");
         });
@@ -527,6 +537,10 @@ public class Main extends Application {
             if (deepTest) {
                 btnReset.setText("Paused");
                 btnDeepTest.setText("Resume");
+                IO.println("Curr Bot: " + currBot);
+                printHistogram(currDepths);
+                IO.println("Test Bot: " + testBot);
+                printHistogram(testDepths);
                 deepTestPaused = true;
                 deepTest = false;
                 whitePlayerHuman = true;
@@ -576,21 +590,56 @@ public class Main extends Application {
         Main.deepTest = tmp;
     }
 
+    private double trimmedMean(int[] histogram) {
+        int total = Arrays.stream(histogram).sum();
+        int sum = 0;
+        int rollingTotal = 0;
+        int lowBound = (int) (.025 * total);
+        int highBound = (int) (.975 * total);
+        for (int i = 0; i < histogram.length; i++) {
+            if (rollingTotal < lowBound) {
+                rollingTotal += histogram[i];
+                if (rollingTotal < lowBound) continue;
+                sum += i * (rollingTotal - lowBound);
+                continue;
+            }
+            if ((rollingTotal + histogram[i]) > highBound) {
+                sum += i * (highBound - rollingTotal);
+                break;
+            }
+            rollingTotal += histogram[i];
+            sum += i * histogram[i];
+        }
+        return (double) sum / total;
+    }
+
+    private void printHistogram(int[] histogram) {
+        int total = Arrays.stream(histogram).sum();
+        int rollingTotal = 0;
+        for (int i = 0; i < histogram.length; i++) {
+            rollingTotal += histogram[i];
+            if (histogram[i] / (double) total < .01) continue;
+            System.out.printf("%s: %.1f%%%n", i, (double) histogram[i] / total * 100);
+            if ((double) rollingTotal / total > .99) break;
+        }
+    }
+
     private void updateInfoText() {
         int eval = currBot.getLastEval();
         int depth = currBot.getLastDepth();
         if (!deepTest && !deepTestPaused) {
-            infoText.setText(String.format("""
+            infoText.setText(format("""
                     Depth: %d
                     Eval: %s
                     """, depth, evalToString(eval, depth)));
             return;
         }
-        infoText.setText(String.format("""
+        infoText.setText(format("""
                         Curr Wins: %s
                         Test Wins: %s
                         Draws: %s
                         P-Value: %.4f
+                        LLR: %.3f
                         
                         Curr Depth: %.2f
                         Test Depth: %.2f
@@ -601,9 +650,8 @@ public class Main extends Application {
                         
                         Curr Name: %s
                         Test Name: %s""",
-                currWins, testWins, draws, pValue,
-                (double) totalCurrDepth / totalCurrMoves,
-                (double) totalTestDepth / totalTestMoves,
+                losses, wins, draws, pValue, llr,
+                trimmedMean(currDepths), trimmedMean(testDepths),
                 2 * (testIdx % 2) - 1 == -1 ? "White" : "Black",
                 2 * (testIdx % 2) - 1 == 1 ? "White" : "Black", evalToString(eval, depth),
                 currBot, testBot));
@@ -983,6 +1031,111 @@ public class Main extends Application {
         gameState.computeMoves();
     }
 
+    private static double probabilityConclusive(double currentLLR, int trialsRemaining, int wins,
+                                                int draws, int losses) {
+        wins++;
+        draws++;
+        losses++;
+        int games = wins + draws + losses;
+        if (games < 2) return 1.0;
+
+        double score = (wins + 0.5 * draws) / games;
+        double eloEstimate = -400.0 * log10(1.0 / score - 1.0);
+        double variance = (wins * pow(1 - score, 2) + draws * pow(0.5 - score, 2) +
+                losses * pow(score, 2)) / games;
+        double scoreSE = sqrt(variance / games);
+
+        double dElo_dScore = 400.0 / (log(10) * score * (1 - score));
+        double eloSE = Math.abs(dElo_dScore) * scoreSE;
+        double extremeElo = eloEstimate + (currentLLR > 0 ? 3 : -3) * eloSE;
+        double drawRate = (double) draws / games;
+
+        double[] q0 = pentaProbabilities(0, drawRate);
+        double[] q1 = pentaProbabilities(7, drawRate);
+
+        double[] qOpt = pentaProbabilities(extremeElo, drawRate);
+
+        double delta = 0;
+        double secondMoment = 0;
+
+        for (int i = 0; i < 5; i++) {
+            double contrib = log(q1[i] / q0[i]);
+            delta += qOpt[i] * contrib;
+            secondMoment += qOpt[i] * contrib * contrib;
+        }
+
+        double sigma = sqrt(max(1e-12, secondMoment - delta * delta));
+
+        double upper = log((1.0 - 0.05) / 0.05);
+        double lower = log(0.05 / (1.0 - 0.05));
+        double target = currentLLR > 0 ? upper : lower;
+
+        double meanFinal = currentLLR + trialsRemaining * delta;
+        double sdFinal = sigma * sqrt(trialsRemaining);
+        double z = currentLLR > 0 ? (target - meanFinal) / sdFinal : (meanFinal - target) / sdFinal;
+
+        return 1 - normalCDF(z);
+    }
+
+    /**
+     * Returns the probability that the SPRT will be conclusive by the end of the simulation given
+     * the current LLR and the number of remaining games.
+     *
+     * @param llr Log-Likelihood Ratio from the SPRT
+     * @return The probability that the SPRT will be conclusive by the end of the simulation given
+     * the current LLR and the number of remaining games.
+     */
+    private static double probabilityConclusive(double llr) {
+        return probabilityConclusive(llr, 1000 - testIdx, wins, draws, losses);
+    }
+
+    private static boolean stop(double llr) {
+        double upper = Math.log((1.0 - 0.05) / 0.05);
+        double lower = Math.log(0.05 / (1.0 - 0.05));
+        return llr > upper || llr < lower;
+    }
+
+    private static double expectedScore(double elo) {
+        return 1 / (1 + Math.pow(10, -elo / 400));
+    }
+
+    private static double[] pentaProbabilities(double elo, double drawRate) {
+        double[] q = new double[5];
+        double winRate = expectedScore(elo) - drawRate * 0.5;
+        double lossRate = 1 - winRate - drawRate;
+
+        q[0] = max(1e-12, lossRate * lossRate);
+        q[1] = max(1e-12, 2 * lossRate * drawRate);
+        q[2] = max(1e-12, drawRate * drawRate + 2 * winRate * lossRate);
+        q[3] = max(1e-12, 2 * drawRate * winRate);
+        q[4] = max(1e-12, winRate * winRate);
+
+        return q;
+    }
+
+    private static double SPRT() {
+        int p0 = penta[0];
+        int p1 = penta[1];
+        int p2 = penta[2];
+        int p3 = penta[3];
+        int p4 = penta[4];
+        int n = p0 + p1 + p2 + p3 + p4;
+        if (n < 2) return 0;
+
+        double elo0 = 0;
+        double elo1 = 7;
+
+        double drawRate = (double) draws / (2 * n);
+
+        double[] q0 = pentaProbabilities(elo0, drawRate);
+        double[] q1 = pentaProbabilities(elo1, drawRate);
+
+        double llr = 0;
+        for (int i = 0; i < 5; i++) llr += penta[i] * log(q1[i] / q0[i]);
+
+        return llr;
+    }
+
     private double getPValue(int wins, int draws, int losses) {
         int n = wins + draws + losses;
         if (n == 0) return 1.0;
@@ -1014,19 +1167,37 @@ public class Main extends Application {
     private void makeBotMoveAsync() {
         if (!gameState.isInProgress() || !appOpen) {
             if (deepTest) {
-                if (gameState.getWinner() == 2 * (testIdx % 2) - 1) testWins++;
-                else if (gameState.getWinner() != 0) currWins++;
+                if (gameState.getWinner() == 2 * (testIdx % 2) - 1) wins++;
+                else if (gameState.getWinner() != 0) losses++;
                 else draws++;
+                if ((draws + losses + wins) % 2 == 1)
+                    lastScore = (gameState.getWinner() == 2 * (testIdx % 2) - 1) ? 1 :
+                            gameState.getWinner() == 0 ? 0.5 : 0;
+                else if (draws + losses + wins > 0) {
+                    lastScore += (gameState.getWinner() == 2 * (testIdx % 2) - 1) ? 1 :
+                            gameState.getWinner() == 0 ? 0.5 : 0;
+                    penta[(int) (lastScore * 2)]++;
+                }
                 testIdx++;
-                pValue = getPValue(currWins, draws, testWins);
-                IO.println("Curr Wins: " + currWins + " Test Wins: " + testWins +
-                        " Draws: " + draws + " P-Value: " + String.format("%.4f", pValue) +
-                        " Curr Depth: " + String.format("%.2f",
-                        (double) totalCurrDepth / totalCurrMoves) +
-                        " Test Depth: " + String.format("%.2f",
-                        (double) totalTestDepth / totalTestMoves));
+                pValue = getPValue(losses, draws, wins);
+                llr = SPRT();
+                double pConclusive = probabilityConclusive(llr);
+                IO.println("Curr Wins: " + losses + " Test Wins: " + wins +
+                        " Draws: " + draws + " P-Value: " + format("%.4f", pValue) +
+                        " LLR: " + format("%.3f", llr) +
+                        " Curr Depth: " + format("%.2f", trimmedMean(currDepths)) +
+                        " Test Depth: " + format("%.2f", trimmedMean(testDepths)));
                 Platform.runLater(this::updateInfoTextDeepTest);
-                if (testIdx >= 1000 || pValue <= .003) {
+                if ((testIdx == 20 && pValue < .01) || testIdx >= 1000 || pValue < .001
+                        || pConclusive < .01 || stop(llr)) {
+                    if (testIdx == 20 && pValue < .01)
+                        IO.println("Automatically stopped at p = " + format("%.4f", pValue));
+                    if (stop(llr) && testIdx < 1000)
+                        IO.println("Automatically stopped at LLR = " + format("%.3f", llr));
+                    if (pValue < .001)
+                        IO.println("Automatically stopped at p = " + format("%.4f", pValue));
+                    if (pConclusive < .01)
+                        IO.println("Automatically stopped at pConclusive = " + format("%.4f", pConclusive));
                     deepTest = false;
                     testIdx = 0;
                     whitePlayerHuman = true;
@@ -1039,8 +1210,10 @@ public class Main extends Application {
                         SoundHandler.playSound("game-end");
                     });
                     shown = true;
-                    if (pValue <= .003 && testIdx < 1000)
-                        IO.println("Automatically stopped at p = " + String.format("%.4f", pValue));
+                    IO.println("Curr Bot: " + currBot);
+                    printHistogram(currDepths);
+                    IO.println("Test Bot: " + testBot);
+                    printHistogram(testDepths);
                     return;
                 }
                 gameStateFuture.clear();
@@ -1056,15 +1229,14 @@ public class Main extends Application {
         }
         selectedSquare = -1;
         new Thread(() -> {
-            makeMove((deepTest && (gameState.getColor() == 2 * (testIdx % 2) - 1) ? testBot :
-                    currBot).getMove(gameState, allottedTime));
-            if (gameState.getColor() == 2 * (testIdx % 2) - 1) {
-                totalCurrDepth += currBot.getLastDepth();
-                totalCurrMoves++;
-            } else {
-                totalTestDepth += testBot.getLastDepth();
-                totalTestMoves++;
-            }
+            makeMove((deepTest && (gameState.getColor() == 2 * (testIdx % 2) - 1) ?
+//                    testBot.getMove(gameState, allottedTime) :
+                    testBot.iterativeDeepening(gameState, 2) :
+//                    currBot.getMove(gameState, allottedTime)));
+                    currBot.iterativeDeepening(gameState, 2)));
+            if (gameState.getColor() == 2 * (testIdx % 2) - 1)
+                currDepths[min(currBot.getLastDepth(), 63)]++;
+            else testDepths[min(testBot.getLastDepth(), 63)]++;
             Platform.runLater(this::updateInfoText);
             gameState.computeMoves();
             if (deepTest || (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman))
