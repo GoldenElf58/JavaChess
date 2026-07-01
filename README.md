@@ -1,4 +1,4 @@
-# Chess
+# Chess Engine
 
 ## Setup Instructions
 
