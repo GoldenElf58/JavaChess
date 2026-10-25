@@ -1,0 +1,83 @@
+plugins {
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+group = 'io.github.goldenelf58'
+version = providers.gradleProperty('releaseVersion').getOrElse('0.1.0')
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+}
+
+javafx {
+    version = '24.0.2'
+    modules = ['javafx.controls', 'javafx.media']
+}
+
+dependencies {
+    compileOnly 'org.jetbrains:annotations:26.0.2'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+            exclude 'archive/bot/**', 'MoveGenTests.java'
+        }
+        resources {
+            srcDirs = ['assets', 'src']
+            include '**/*.png', '**/*.mp3', 'game/start_positions.txt'
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src']
+            include 'MoveGenTests.java'
+        }
+    }
+}
+
+application {
+    mainClass = 'Main'
+    applicationDefaultJvmArgs = ['--enable-native-access=javafx.graphics,javafx.media']
+}
+
+tasks.register('jpackageImage', Exec) {
+    group = 'distribution'
+    description = 'Builds an app image with a private Java runtime for the current operating system.'
+    dependsOn installDist
+
+    doFirst {
+        def javaHome = file(System.getProperty('java.home'))
+        def jpackage = new File(javaHome, "bin/jpackage${System.getProperty('os.name').toLowerCase().contains('win') ? '.exe' : ''}")
+        def installLib = layout.buildDirectory.dir("install/${project.name}/lib").get().asFile
+        def outputDir = layout.buildDirectory.dir('jpackage').get().asFile
+        def modulePath = ([new File(javaHome, 'jmods')] + configurations.runtimeClasspath.files)
+                .collect { it.absolutePath }
+                .join(File.pathSeparator)
+        def appJar = tasks.named('jar').get().archiveFile.get().asFile.name
+
+        delete(outputDir)
+        commandLine jpackage,
+                '--type', 'app-image',
+                '--name', 'JavaChess',
+                '--dest', outputDir,
+                '--input', installLib,
+                '--main-jar', appJar,
+                '--main-class', 'Main',
+                '--module-path', modulePath,
+                '--add-modules', 'javafx.controls,javafx.media',
+                '--java-options', '--enable-native-access=javafx.graphics,javafx.media'
+    }
+}

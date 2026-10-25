@@ -4,7 +4,6 @@ import game.GameState;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,7 +16,10 @@ public class SoundHandler {
 
     public static void loadSounds() {
         for (String file : files) {
-            Media media = new Media(new File("src/sounds/" + file + ".mp3").toURI().toString());
+            String path = "/sounds/" + file + ".mp3";
+            var resource = SoundHandler.class.getResource(path);
+            if (resource == null) throw new IllegalStateException("Missing sound: " + path);
+            Media media = new Media(resource.toExternalForm());
             soundCache.put(file, media);
         }
         soundsLoaded = true;

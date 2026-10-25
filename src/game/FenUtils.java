@@ -1,8 +1,10 @@
 package game;
 
-import java.io.File;
-import java.io.FileReader;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 public class FenUtils {
@@ -20,14 +22,16 @@ public class FenUtils {
     }
 
     public static GameState getFenGameState(int i) {
-        File fens = new File("src/game/start_positions.txt");
-        String fen;
-        try (FileReader fr = new FileReader(fens)) {
-            fen = fr.readAllLines().get(i);
+        String path = "/game/start_positions.txt";
+        InputStream resource = FenUtils.class.getResourceAsStream(path);
+        if (resource == null) throw new IllegalStateException("Missing starting positions: " + path);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource, StandardCharsets.UTF_8))) {
+            String fen = reader.lines().skip(i).findFirst()
+                    .orElseThrow(() -> new IndexOutOfBoundsException("No starting position at index " + i));
+            return fenToGameState(fen);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return fenToGameState(fen);
     }
 
     public static GameState fenToGameState(String fen) {

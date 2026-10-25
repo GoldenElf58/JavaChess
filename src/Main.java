@@ -34,7 +34,6 @@ import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 import utils.Watch;
 
-import java.io.File;
 import java.util.*;
 
 import static java.lang.Math.*;
@@ -972,14 +971,10 @@ public class Main extends Application {
     private void getPromotionMove(byte[] move) {
         byte color = gameState.getColor();
         int dest = move[0] == -2 ? move[1] - 8 * color : move[2];
-        pieces[dest].setImage(imageCache.computeIfAbsent(5 * color, _ ->
-                new Image(new File("src/piece_images/" + 5 + color + ".png").toURI().toString())));
-        pieces[dest + 8 * color].setImage(imageCache.computeIfAbsent(2 * color, _ ->
-                new Image(new File("src/piece_images/" + 2 * color + ".png").toURI().toString())));
-        pieces[dest + 16 * color].setImage(imageCache.computeIfAbsent(4 * color, _ ->
-                new Image(new File("src/piece_images/" + 4 * color + ".png").toURI().toString())));
-        pieces[dest + 24 * color].setImage(imageCache.computeIfAbsent(3 * color, _ ->
-                new Image(new File("src/piece_images/" + 3 * color + ".png").toURI().toString())));
+        pieces[dest].setImage(imageCache.computeIfAbsent(5 * color, Main::loadPieceImage));
+        pieces[dest + 8 * color].setImage(imageCache.computeIfAbsent(2 * color, Main::loadPieceImage));
+        pieces[dest + 16 * color].setImage(imageCache.computeIfAbsent(4 * color, Main::loadPieceImage));
+        pieces[dest + 24 * color].setImage(imageCache.computeIfAbsent(3 * color, Main::loadPieceImage));
         pieces[move[1]].setVisible(false);
         pieces[dest].setVisible(true);
         pieces[dest + 8 * color].setVisible(true);
@@ -1409,14 +1404,20 @@ public class Main extends Application {
             return;
         }
         if (!promotionChoice) piece.setVisible(true);
-        if (!promotionChoice) piece.setImage(imageCache.computeIfAbsent(pieceType, c ->
-                new Image(new File("src" + "/piece_images/" + c + ".png").toURI().toString())));
+        if (!promotionChoice) piece.setImage(imageCache.computeIfAbsent(pieceType, Main::loadPieceImage));
         if (i == selectedSquare && dragging) {
             piece.setX(mousePose[0] - squareWidth / 2);
             piece.setY(mousePose[1] - squareWidth / 2);
             piece.toFront();
             darkRect.toFront();
         }
+    }
+
+    private static Image loadPieceImage(int pieceType) {
+        String path = "/piece_images/" + pieceType + ".png";
+        var resource = Main.class.getResource(path);
+        if (resource == null) throw new IllegalStateException("Missing piece image: " + path);
+        return new Image(resource.toExternalForm());
     }
 
     public static void drawArrow(Scene scene, Group pencilMarkings, int square1, int square2) {
