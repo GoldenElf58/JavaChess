@@ -1232,10 +1232,17 @@ public class Main extends Application {
         }
         selectedSquare = -1;
         new Thread(() -> {
-            makeMove((deepTest && (gameState.getColor() == 2 * (testIdx % 2) - 1) ?
+            GameState initialState = gameState;
+            int move = deepTest && (gameState.getColor() == 2 * (testIdx % 2) - 1) ?
                     testBot.getMove(gameState, allottedTime) :
 //                    testBot.iterativeDeepening(gameState, 2) :
-                    currBot.getMove(gameState, allottedTime)));
+                    currBot.getMove(gameState, allottedTime);
+            if (initialState != gameState) {
+                if (deepTest || (gameState.isWhiteMove() ? !whitePlayerHuman : !blackPlayerHuman))
+                    makeBotMoveAsync();
+                return;
+            }
+            makeMove(move);
 //                    currBot.iterativeDeepening(gameState, 2)));
             if (gameState.getColor() == 2 * (testIdx % 2) - 1)
                 currDepths[min(currBot.getLastDepth(), 63)]++;
