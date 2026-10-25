@@ -20,7 +20,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 javafx {
-    version = '24.0.2'
+    version = '25.0.5'
     modules = ['javafx.controls', 'javafx.media']
 }
 
