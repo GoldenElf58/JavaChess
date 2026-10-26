@@ -7,7 +7,7 @@ A desktop chess game built with Java and JavaFX.
 Download the archive for your operating system from the [GitHub Releases page](https://github.com/GoldenElf58/JavaChess/releases) and unzip it.
 
 - **Windows:** launch `JavaChess.exe` from the extracted folder.
-- **macOS:** move `JavaChess.app` to Applications and open it. If you get a message that says "Apple could not verify “tractor-ai-macos” is free of malware that may harm your Mac or compromise your privacy," click " Done". Go to System Settings/Privacy & Security and scroll down to the Security section. Click "Open Anyway" next to the message that says "tractor-ai-macos was blocked to protect your app". Click " Open Anyway" one more time, then type in your password. You're good to go!
+- **macOS:** move `JavaChess.app` to Applications and open it. If you get a message that says "Apple could not verify “tractor-ai-macos” is free of malware that may harm your Mac or compromise your privacy," click " Done". Go to System Settings/Privacy & Security and scroll down to the Security section. Click "Open Anyway" next to the message that says "JavaChess.app was blocked to protect your app". Click " Open Anyway" one more time, then type in your password. You're good to go!
 - **Linux:** run `JavaChess/bin/JavaChess` from the extracted folder.
 
 ## Run from source
